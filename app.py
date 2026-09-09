@@ -208,6 +208,11 @@ game_html = """
             }
         }
 
+        window.onerror = function(msg, url, line){
+            console.error(msg, url, line);
+            return false;
+        };
+
         let keys = {};
         window.addEventListener("keydown", (e) => {
             if (isPaused || isGameOver) return;
@@ -451,12 +456,12 @@ game_html = """
         }
 
         function addDamageText(x, y, text, color, life=30) {
-            if (damageTexts.length > 25) damageTexts.shift();
+            while (damageTexts.length > 50) damageTexts.shift();
             damageTexts.push({ x, y, text: String(text), color, life: life, opacity: 1 });
         }
 
         function createParticles(x, y, color, count = 8) {
-            if (particles.length > 100) return;
+            while (particles.length > 200) particles.shift();
             for (let i = 0; i < count; i++) {
                 particles.push({
                     x, y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
@@ -513,7 +518,13 @@ game_html = """
             if (player.parryTimer > 0) { player.parryTimer--; if (player.parryTimer === 0) player.isParrying = false; }
             if (player.parryCooldown > 0) player.parryCooldown--;
 
-            chests.forEach((chest, idx) => { if (Math.hypot(player.x - chest.x, player.y - chest.y) < player.radius + chest.radius) openChest(idx); });
+            for (let i = chests.length - 1; i >= 0; i--) {
+                let chest = chests[i];
+                if (Math.hypot(player.x - chest.x, player.y - chest.y) < player.radius + chest.radius) {
+                    openChest(i);
+                    break;
+                }
+            }
 
             enemies.forEach((enemy) => {
                 if (enemy.burnTimer > 0) {
@@ -610,7 +621,7 @@ game_html = """
                             if (player.isParrying) {
                                 executeParry(enemy.x, enemy.y, true);
                             } else if (player.invincibleTimer <= 0) {
-                                player.hp -= 40;
+                                player.hp -= 22;
                                 addDamageText(player.x, player.y - 20, "-40 HP", "#ff0000");
                             }
                         }
