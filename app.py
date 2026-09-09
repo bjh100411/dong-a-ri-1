@@ -1,248 +1,191 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import random
 
-st.set_page_config(page_title="나만의 리듬게임", layout="centered")
+# --- 페이지 설정 ---
+st.set_page_config(page_title="Breach Protocol", layout="wide")
 
-st.title("🎹 웹 기반 건반 리듬게임")
-st.write("시작하려면 화면을 한 번 클릭한 뒤 **스페이스바**를 누르세요. (D, F, J, K 키 사용)")
-
-# 난이도 선택
-difficulty = st.selectbox("난이도를 선택하세요", ["Easy", "Hard"])
-speed = 5 if difficulty == "Easy" else 8
-bpm = 120 if difficulty == "Easy" else 180 
-
-game_code = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-    body {{ margin: 0; display: flex; justify-content: center; background-color: #111; color: white; font-family: sans-serif; overflow: hidden; }}
-    canvas {{ background-color: #000; border: 2px solid #333; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }}
-    #ui {{ position: absolute; top: 10px; display: flex; justify-content: space-between; width: 380px; pointer-events: none; padding: 0 10px; font-size: 20px; font-weight: bold; }}
-</style>
-</head>
-<body>
-    <div id="ui">
-        <div>Score: <span id="score">0</span></div>
-        <div>Combo: <span id="combo">0</span></div>
-    </div>
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
-
-<script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+# --- 커스텀 CSS (사이버펑크 테마) ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
     
-    const keys = ["d", "f", "j", "k"];
-    const laneWidth = canvas.width / 4;
-    const hitY = canvas.height - 100;
-    const speed = {speed};
-    const bpm = {bpm};
-    const beatInterval = 60000 / bpm; 
+    /* 전체 배경 및 폰트 설정 */
+    .stApp {
+        background-color: #0B0C10;
+        color: #C5C6C7;
+        font-family: 'Share Tech Mono', monospace;
+    }
     
-    let score = 0;
-    let combo = 0;
-    let gameState = 0; 
-    let gameStartTime = null;
-    let lastBeatTime = 0;
-    
-    let activeNotes = [];
-    let effects = []; 
-    
-    let judgmentText = "";
-    let judgmentColor = "";
-    let judgmentTimer = 0;
+    h1, h2, h3 {
+        color: #FF003C !important;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 2px 2px 0px #00E6F6;
+    }
 
-    // 🎵 여러 가지 노트 패턴 정의 (0=D, 1=F, 2=J, 3=K)
-    const patterns = [
-        [[0], [1], [2], [3]],                   // 1. 왼쪽에서 오른쪽 계단
-        [[3], [2], [1], [0]],                   // 2. 오른쪽에서 왼쪽 계단
-        [[0, 3], [1, 2], [0, 3], [1, 2]],       // 3. 양끝 동시 -> 가운데 동시 교차
-        [[0], [2], [1], [3]],                   // 4. 지그재그
-        [[0, 1], [2, 3], [0, 1], [2, 3]],       // 5. 왼쪽 두개 -> 오른쪽 두개
-        [[0, 1, 2, 3], [], [0, 1, 2, 3], []]    // 6. 4키 전체 동시 치기 후 한 박자 쉬기
-    ];
+    /* 버튼 스타일 (매트릭스 코드) */
+    div.stButton > button {
+        background-color: transparent !important;
+        color: #00E6F6 !important;
+        border: 2px solid #1F2833 !important;
+        font-family: 'Share Tech Mono', monospace !important;
+        font-size: 20px !important;
+        width: 100%;
+        height: 60px;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        border-color: #FF003C !important;
+        color: #FF003C !important;
+        box-shadow: 0 0 10px #FF003C;
+    }
+    div.stButton > button:active {
+        background-color: #FF003C !important;
+        color: #0B0C10 !important;
+    }
     
-    let currentPattern = [];
-    let patternStep = 0;
+    /* 버퍼 및 텍스트 스타일 */
+    .buffer-box {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 2px solid #F3E600;
+        text-align: center;
+        line-height: 36px;
+        font-size: 20px;
+        color: #F3E600;
+        margin-right: 10px;
+        background-color: rgba(243, 230, 0, 0.1);
+    }
+    .target-seq {
+        font-size: 22px;
+        color: #FFFFFF;
+        background-color: #1F2833;
+        padding: 5px 15px;
+        margin-bottom: 10px;
+        border-left: 5px solid #FF003C;
+    }
+    .highlight { color: #F3E600; }
+    </style>
+""", unsafe_allow_html=True)
 
-    function startGame() {{
-        gameState = 1;
-        gameStartTime = performance.now();
-        lastBeatTime = gameStartTime;
-        score = 0;
-        combo = 0;
-        activeNotes = [];
-        patternStep = 0; // 시작할 때 패턴 스텝 초기화
-        currentPattern = patterns[0]; // 첫 패턴 설정
+# --- 게임 상태 초기화 ---
+HEX_CODES = ['1C', '55', 'BD', 'E9', '7A']
+MATRIX_SIZE = 5
+BUFFER_SIZE = 6
+
+if 'initialized' not in st.session_state:
+    st.session_state.initialized = True
+    # 5x5 행렬 생성
+    st.session_state.matrix = [[random.choice(HEX_CODES) for _ in range(MATRIX_SIZE)] for _ in range(MATRIX_SIZE)]
+    # 타겟 시퀀스 생성 (길이 3)
+    st.session_state.targets = {
+        "DATAMINE_V1": [random.choice(HEX_CODES) for _ in range(3)],
+        "DATAMINE_V2": [random.choice(HEX_CODES) for _ in range(3)]
+    }
+    st.session_state.buffer = []
+    st.session_state.clicked = set() # 클릭된 좌표 (r, c) 저장
+    st.session_state.is_row = True   # True면 가로(행) 선택 차례, False면 세로(열) 선택 차례
+    st.session_state.current_idx = 0 # 현재 활성화된 행/열의 인덱스
+    st.session_state.game_over = False
+    st.session_state.success = []
+
+# --- 게임 로직 ---
+def handle_click(r, c, code):
+    if st.session_state.game_over: return
+    
+    # 룰 체크: 현재 활성화된 행(또는 열)인지 확인
+    if st.session_state.is_row and r != st.session_state.current_idx: return
+    if not st.session_state.is_row and c != st.session_state.current_idx: return
+    
+    # 버퍼 추가 및 상태 업데이트
+    st.session_state.buffer.append(code)
+    st.session_state.clicked.add((r, c))
+    
+    # 방향 전환 및 다음 활성 인덱스 설정
+    st.session_state.is_row = not st.session_state.is_row
+    st.session_state.current_idx = c if not st.session_state.is_row else r
+    
+    # 타겟 달성 확인
+    for name, seq in st.session_state.targets.items():
+        if name in st.session_state.success: continue
+        # 버퍼 내에서 시퀀스가 연속으로 존재하는지 확인
+        seq_str = " ".join(seq)
+        buf_str = " ".join(st.session_state.buffer)
+        if seq_str in buf_str:
+            st.session_state.success.append(name)
+            
+    # 종료 조건 (버퍼가 가득 참)
+    if len(st.session_state.buffer) >= BUFFER_SIZE:
+        st.session_state.game_over = True
+
+def reset_game():
+    del st.session_state['initialized']
+
+# --- UI 렌더링 ---
+st.title("BREACH PROTOCOL_")
+
+col1, col2 = st.columns([2, 1])
+
+with col2:
+    st.markdown("### TARGET SEQUENCES")
+    for name, seq in st.session_state.targets.items():
+        status = "✅ UPLOADED" if name in st.session_state.success else "WAITING..."
+        color = "#00E6F6" if name in st.session_state.success else "#FF003C"
+        st.markdown(f"""
+        <div class="target-seq">
+            <span style="color:{color}; font-weight:bold;">{name}</span><br>
+            {" ".join(seq)} - {status}
+        </div>
+        """, unsafe_allow_html=True)
         
-        document.getElementById("score").innerText = score;
-        document.getElementById("combo").innerText = combo;
-        requestAnimationFrame(gameLoop);
-    }}
+    st.markdown("### BUFFER")
+    buffer_html = ""
+    for i in range(BUFFER_SIZE):
+        if i < len(st.session_state.buffer):
+            buffer_html += f'<div class="buffer-box">{st.session_state.buffer[i]}</div>'
+        else:
+            buffer_html += '<div class="buffer-box"></div>'
+    st.markdown(buffer_html, unsafe_allow_html=True)
 
-    window.addEventListener("keydown", (e) => {{
-        if (gameState === 0 && e.code === "Space") {{
-            startGame();
-            return;
-        }}
+    if st.session_state.game_over:
+        if len(st.session_state.success) > 0:
+            st.success("ACCESS GRANTED: Data Extracted.")
+        else:
+            st.error("BREACH FAILED: Disconnected.")
+        st.button("REBOOT SYSTEM", on_click=reset_game)
+    else:
+        direction = "HORIZONTAL (ROW)" if st.session_state.is_row else "VERTICAL (COLUMN)"
+        st.info(f"CURRENT TRACE: **{direction}**")
 
-        if (gameState !== 1) return;
-
-        const keyIndex = keys.indexOf(e.key.toLowerCase());
-        if (keyIndex > -1) {{
-            const hitZone = 70; 
-            let closestNoteIndex = -1;
-            let minDistance = Infinity;
-
-            for (let i = 0; i < activeNotes.length; i++) {{
-                if (activeNotes[i].lane === keyIndex) {{
-                    const dist = Math.abs(activeNotes[i].y - hitY);
-                    if (dist < hitZone && dist < minDistance) {{
-                        minDistance = dist;
-                        closestNoteIndex = i;
-                    }}
-                }}
-            }}
-
-            if (closestNoteIndex > -1) {{
-                let text, color, pts;
-                if (minDistance <= 15) {{
-                    text = "Perfect!"; color = "#FFD700"; pts = 100;
-                }} else if (minDistance <= 35) {{
-                    text = "Expert"; color = "#00FF00"; pts = 70;
-                }} else if (minDistance <= 50) {{
-                    text = "Good"; color = "#00BFFF"; pts = 40;
-                }} else {{
-                    text = "Bad"; color = "#FF4500"; pts = 10;
-                }}
-
-                judgmentText = text;
-                judgmentColor = color;
-                judgmentTimer = 30; 
-
-                score += pts;
-                if (text !== "Bad") combo++; else combo = 0;
+with col1:
+    st.markdown("### CODE MATRIX")
+    
+    # 매트릭스 그리드 생성
+    for r in range(MATRIX_SIZE):
+        cols = st.columns(MATRIX_SIZE)
+        for c in range(MATRIX_SIZE):
+            with cols[c]:
+                code = st.session_state.matrix[r][c]
                 
-                document.getElementById("score").innerText = score;
-                document.getElementById("combo").innerText = combo;
+                # 버튼 비활성화 로직 (이미 클릭했거나, 룰에 어긋나는 경우)
+                is_disabled = (r, c) in st.session_state.clicked or st.session_state.game_over
+                if not is_disabled:
+                    if st.session_state.is_row and r != st.session_state.current_idx:
+                        is_disabled = True
+                    if not st.session_state.is_row and c != st.session_state.current_idx:
+                        is_disabled = True
+                
+                # 라벨 텍스트 표시 (클릭된 건 [XX] 로 표시)
+                label = f"[{code}]" if (r, c) in st.session_state.clicked else code
+                
+                st.button(
+                    label,
+                    key=f"btn_{r}_{c}",
+                    disabled=is_disabled,
+                    on_click=handle_click,
+                    args=(r, c, code)
+                )
 
-                effects.push({{
-                    x: keyIndex * laneWidth + laneWidth / 2,
-                    y: hitY,
-                    radius: 10,
-                    alpha: 1,
-                    color: color
-                }});
-
-                activeNotes.splice(closestNoteIndex, 1); 
-            }} else {{
-                combo = 0;
-                document.getElementById("combo").innerText = combo;
-            }}
-        }}
-    }});
-
-    function gameLoop(currentTime) {{
-        if (gameState !== 1) return;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 🎵 정해진 패턴에 따라 노트 생성
-        if (currentTime - lastBeatTime > beatInterval) {{
-            // 현재 패턴의 모든 노트를 다 내보냈다면 새로운 패턴 무작위 선택
-            if (patternStep >= currentPattern.length) {{
-                const randomIndex = Math.floor(Math.random() * patterns.length);
-                currentPattern = patterns[randomIndex];
-                patternStep = 0;
-            }}
-
-            // 현재 스텝의 레인 배열 가져오기 (예: [0, 3])
-            const lanesToSpawn = currentPattern[patternStep];
-            
-            for(let i = 0; i < lanesToSpawn.length; i++) {{
-                activeNotes.push({{
-                    time: currentTime + 2000, 
-                    lane: lanesToSpawn[i],
-                    y: -50
-                }});
-            }}
-            
-            patternStep++;
-            lastBeatTime = currentTime;
-        }}
-
-        ctx.strokeStyle = "#333";
-        for(let i=1; i<4; i++) {{
-            ctx.beginPath();
-            ctx.moveTo(i * laneWidth, 0);
-            ctx.lineTo(i * laneWidth, canvas.height);
-            ctx.stroke();
-        }}
-
-        ctx.fillStyle = "rgba(255, 85, 85, 0.5)";
-        ctx.fillRect(0, hitY - 15, canvas.width, 30); 
-        ctx.fillStyle = "#FF5555";
-        ctx.fillRect(0, hitY, canvas.width, 3); 
-
-        for (let i = activeNotes.length - 1; i >= 0; i--) {{
-            let note = activeNotes[i];
-            
-            const timeUntilHit = note.time - currentTime;
-            note.y = hitY - (timeUntilHit / 1000 * 60 * speed);
-
-            if (note.y > canvas.height) {{
-                activeNotes.splice(i, 1);
-                combo = 0;
-                document.getElementById("combo").innerText = combo;
-                judgmentText = "Miss";
-                judgmentColor = "#888";
-                judgmentTimer = 30;
-                continue;
-            }}
-
-            if (note.y > -50) {{
-                ctx.fillStyle = "#00DDFF";
-                ctx.beginPath();
-                ctx.roundRect(note.lane * laneWidth + 5, note.y - 10, laneWidth - 10, 20, 5);
-                ctx.fill();
-            }}
-        }}
-
-        for (let i = effects.length - 1; i >= 0; i--) {{
-            let eff = effects[i];
-            ctx.beginPath();
-            ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = eff.color;
-            ctx.globalAlpha = eff.alpha;
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.globalAlpha = 1.0; 
-
-            eff.radius += 2; 
-            eff.alpha -= 0.05; 
-
-            if (eff.alpha <= 0) effects.splice(i, 1);
-        }}
-
-        if (judgmentTimer > 0) {{
-            ctx.fillStyle = judgmentColor;
-            ctx.font = "bold 30px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(judgmentText, canvas.width / 2, hitY - 100);
-            judgmentTimer--;
-        }}
-
-        requestAnimationFrame(gameLoop);
-    }}
-
-    ctx.fillStyle = "white";
-    ctx.font = "bold 20px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("스페이스바를 눌러 게임 시작!", canvas.width / 2, canvas.height / 2);
-
-</script>
-</body>
-</html>
-"""
-
-components.html(game_code, height=650)
+# 가이드 추가
+st.caption("SYSTEM INSTRUCTION: 1. 첫 클릭은 반드시 맨 윗줄(가로)에서 시작합니다. 2. 가로 -> 세로 -> 가로 순으로 번갈아 선택해야 합니다. 3. Target Sequence를 조합해 데이터를 빼내십시오.")
