@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Parry & Skill Action", page_icon="⚔️", layout="centered")
 
-st.title("⚔️ 멀티 적 패링 & 랜덤 스킬 액션")
+st.title("⚔️ 근거리 & 원거리 멀티 적 패링 액션")
 st.caption("WASD / 방향키 : 이동 | Spacebar : 패링 | 숫자 1, 2, 3 또는 클릭 : 스킬 선택")
 
 game_html = """
@@ -152,8 +152,9 @@ game_html = """
             parryCooldown: 0
         };
 
-        // 적 목록 및 웨이브 시스템
+        // 적, 투사체, 파티클 배열
         let enemies = [];
+        let projectiles = [];
         let particles = [];
         let damageTexts = [];
         let screenShake = 0;
@@ -185,7 +186,7 @@ game_html = """
                         let dx = e.x - player.x;
                         let dy = e.y - player.y;
                         let dist = Math.hypot(dx, dy) || 1;
-                        if (dist < 220) {
+                        if (dist < 250) {
                             e.hp -= 90;
                             e.x += (dx / dist) * 120;
                             e.y += (dy / dist) * 120;
@@ -202,7 +203,7 @@ game_html = """
                 action: () => {
                     enemies.forEach(e => {
                         e.hp -= 40;
-                        e.freezeTimer = 180; // 3초 (60fps 기준)
+                        e.freezeTimer = 180;
                         addDamageText(e.x, e.y - 20, "40", "#88ffff");
                         createParticles(e.x, e.y, "#88ffff", 10);
                     });
@@ -211,11 +212,11 @@ game_html = """
             {
                 name: "회오리 난무",
                 icon: "🌪️",
-                desc: "칼날 회오리를 일으켜 가까운 적들에게 100 데미지를 입힙니다.",
+                desc: "칼날 회오리를 일으켜 근처 적들에게 100 데미지를 입힙니다.",
                 action: () => {
                     enemies.forEach(e => {
                         let dist = Math.hypot(e.x - player.x, e.y - player.y);
-                        if (dist < 180) {
+                        if (dist < 200) {
                             e.hp -= 100;
                             addDamageText(e.x, e.y - 20, "100", "#00ff88");
                             createParticles(e.x, e.y, "#00ff88", 15);
@@ -226,7 +227,7 @@ game_html = """
             {
                 name: "흡혈 충격파",
                 icon: "🩸",
-                desc: "적들에게 50 데미지를 입히고, 플레이어의 HP를 30 회복합니다.",
+                desc: "적들에게 50 데미지를 입히고, 플레이어 HP를 30 회복합니다.",
                 action: () => {
                     player.hp = Math.min(player.maxHp, player.hp + 30);
                     addDamageText(player.x, player.y - 25, "+30 HP", "#00ff00");
@@ -240,7 +241,7 @@ game_html = """
             {
                 name: "유도 검기",
                 icon: "🗡️",
-                desc: "모든 적 위치에 검기를 소환하여 각 60의 데미지를 가합니다.",
+                desc: "모든 적 위치에 검기를 소환하여 60 데미지를 가합니다.",
                 action: () => {
                     enemies.forEach(e => {
                         e.hp -= 60;
@@ -251,9 +252,9 @@ game_html = """
             }
         ];
 
-        // 적 생성
+        // 적 스폰 (근거리 60%, 원거리 40%)
         function spawnEnemy() {
-            if (enemies.length >= 8) return; // 최대 적 제한
+            if (enemies.length >= 8) return;
             let x, y;
             if (Math.random() < 0.5) {
                 x = Math.random() < 0.5 ? -20 : canvas.width + 20;
@@ -262,32 +263,33 @@ game_html = """
                 x = Math.random() * canvas.width;
                 y = Math.random() < 0.5 ? -20 : canvas.height + 20;
             }
+
+            let isRanged = Math.random() < 0.4; // 40% 확률로 원거리 적
             enemies.push({
                 x: x,
                 y: y,
-                radius: 16,
-                hp: 120,
-                maxHp: 120,
-                speed: 1.2 + Math.random() * 0.8,
-                state: "chase", // chase, windup, attack, stun
+                type: isRanged ? "ranged" : "melee",
+                radius: isRanged ? 14 : 16,
+                hp: isRanged ? 80 : 120,
+                maxHp: isRanged ? 80 : 120,
+                speed: isRanged ? 1.0 : 1.5,
+                state: "chase",
                 stateTimer: 0,
                 freezeTimer: 0
             });
         }
-        setInterval(spawnEnemy, 2500);
+        setInterval(spawnEnemy, 2200);
 
         function triggerParry() {
             if (player.parryCooldown <= 0) {
                 player.isParrying = true;
-                player.parryTimer = 14; // 패링 유효 프레임
+                player.parryTimer = 14;
                 player.parryCooldown = 35;
             }
         }
 
-        // 패링 성공 시 스킬 선택창 오픈
         function openSkillMenu() {
             isSkillMenuOpen = true;
-            // 스킬 중 무작위 3개 추출
             let shuffled = [...SKILL_POOL].sort(() => 0.5 - Math.random());
             currentOptions = shuffled.slice(0, 3);
 
@@ -335,7 +337,7 @@ game_html = """
         }
 
         function update() {
-            if (isSkillMenuOpen) return; // 메뉴 창 열리면 게임 일시정지
+            if (isSkillMenuOpen) return;
 
             // 1. 플레이어 이동 처리
             let moveX = 0, moveY = 0;
@@ -352,25 +354,23 @@ game_html = """
             player.x += moveX * player.speed;
             player.y += moveY * player.speed;
 
-            // 묵직한 패링 관성 반동 물리 (Friction)
+            // 묵직한 패링 반동 마찰력 계산
             player.x += player.vx;
             player.y += player.vy;
             player.vx *= 0.82;
             player.vy *= 0.82;
 
-            // 맵 경계 제한
             player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
             player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-            // 패링 타이머 관리
             if (player.parryTimer > 0) {
                 player.parryTimer--;
                 if (player.parryTimer === 0) player.isParrying = false;
             }
             if (player.parryCooldown > 0) player.parryCooldown--;
 
-            // 2. 적 AI 및 충돌 로직
-            enemies.forEach((enemy, index) => {
+            // 2. 적 행동 제어
+            enemies.forEach((enemy) => {
                 if (enemy.freezeTimer > 0) {
                     enemy.freezeTimer--;
                     return;
@@ -378,64 +378,137 @@ game_html = """
 
                 let dx = player.x - enemy.x;
                 let dy = player.y - enemy.y;
-                let dist = Math.hypot(dx, dy);
+                let dist = Math.hypot(dx, dy) || 1;
 
                 enemy.stateTimer++;
 
-                if (enemy.state === "chase") {
-                    // 플레이어 추적
-                    enemy.x += (dx / dist) * enemy.speed;
-                    enemy.y += (dy / dist) * enemy.speed;
-
-                    // 일정 거리 접근 시 공격 전조(Windup) 시작
-                    if (dist < 45) {
-                        enemy.state = "windup";
-                        enemy.stateTimer = 0;
-                    }
-                } else if (enemy.state === "windup") {
-                    // 0.5초 동안 주황색으로 준비
-                    if (enemy.stateTimer > 25) {
-                        enemy.state = "attack";
-                        enemy.stateTimer = 0;
-                    }
-                } else if (enemy.state === "attack") {
-                    // 공격 판정 순간
-                    if (player.isParrying && dist < 65) {
-                        // ★ 패링 성공 ★
-                        screenShake = 18;
-                        score += 200;
-
-                        // 묵직한 밀림 연출: 공격한 적의 반대 방향으로 강하게 튕겨나감
-                        let pushAngle = Math.atan2(dy, dx); // 적 -> 플레이어 방향
-                        player.vx = Math.cos(pushAngle) * 26; 
-                        player.vy = Math.sin(pushAngle) * 26;
-
-                        // 이펙트 및 적 데미지
-                        createParticles(player.x, player.y, "#00ffff", 25);
-                        enemy.hp -= 40;
-                        addDamageText(enemy.x, enemy.y - 15, "PARRY! -40", "#00ffff");
-                        enemy.state = "stun";
-                        enemy.stateTimer = 0;
-
-                        // 스킬 메뉴 트리거
-                        openSkillMenu();
-                    } else if (enemy.stateTimer > 8) {
-                        // 패링 실패 (피격)
+                if (enemy.type === "melee") {
+                    // [근거리 적 AI]
+                    if (enemy.state === "chase") {
+                        enemy.x += (dx / dist) * enemy.speed;
+                        enemy.y += (dy / dist) * enemy.speed;
                         if (dist < 45) {
-                            player.hp = Math.max(0, player.hp - 15);
-                            screenShake = 10;
-                            addDamageText(player.x, player.y - 20, "-15 HP", "#ff0000");
-                            // 피격 밀림
-                            player.vx = (dx / dist) * 10;
-                            player.vy = (dy / dist) * 10;
+                            enemy.state = "windup";
+                            enemy.stateTimer = 0;
                         }
-                        enemy.state = "stun";
-                        enemy.stateTimer = 0;
+                    } else if (enemy.state === "windup") {
+                        if (enemy.stateTimer > 25) {
+                            enemy.state = "attack";
+                            enemy.stateTimer = 0;
+                        }
+                    } else if (enemy.state === "attack") {
+                        if (player.isParrying && dist < 65) {
+                            // 근거리 패링 성공
+                            screenShake = 18;
+                            score += 200;
+                            let pushAngle = Math.atan2(dy, dx);
+                            player.vx = Math.cos(pushAngle) * 26;
+                            player.vy = Math.sin(pushAngle) * 26;
+
+                            createParticles(player.x, player.y, "#00ffff", 25);
+                            enemy.hp -= 40;
+                            addDamageText(enemy.x, enemy.y - 15, "PARRY! -40", "#00ffff");
+                            enemy.state = "stun";
+                            enemy.stateTimer = 0;
+
+                            openSkillMenu();
+                        } else if (enemy.stateTimer > 8) {
+                            if (dist < 45) {
+                                player.hp = Math.max(0, player.hp - 15);
+                                screenShake = 10;
+                                addDamageText(player.x, player.y - 20, "-15 HP", "#ff0000");
+                                player.vx = (dx / dist) * 10;
+                                player.vy = (dy / dist) * 10;
+                            }
+                            enemy.state = "stun";
+                            enemy.stateTimer = 0;
+                        }
+                    } else if (enemy.state === "stun") {
+                        if (enemy.stateTimer > 40) {
+                            enemy.state = "chase";
+                            enemy.stateTimer = 0;
+                        }
                     }
-                } else if (enemy.state === "stun") {
-                    if (enemy.stateTimer > 40) {
-                        enemy.state = "chase";
-                        enemy.stateTimer = 0;
+                } else if (enemy.type === "ranged") {
+                    // [원거리 적 AI] 적정 거리 유지
+                    let idealDist = 220;
+                    if (enemy.state === "chase") {
+                        if (dist < idealDist - 30) {
+                            // 플레이어가 너무 가까우면 뒤로 도망
+                            enemy.x -= (dx / dist) * enemy.speed;
+                            enemy.y -= (dy / dist) * enemy.speed;
+                        } else if (dist > idealDist + 30) {
+                            // 너무 멀면 추적
+                            enemy.x += (dx / dist) * enemy.speed;
+                            enemy.y += (dy / dist) * enemy.speed;
+                        }
+
+                        if (enemy.stateTimer > 70) { // 사격 조준 시작
+                            enemy.state = "windup";
+                            enemy.stateTimer = 0;
+                        }
+                    } else if (enemy.state === "windup") {
+                        // 차징 모션 (주황색)
+                        if (enemy.stateTimer > 35) {
+                            // 투사체 발사!
+                            let projSpeed = 5.5;
+                            projectiles.push({
+                                x: enemy.x,
+                                y: enemy.y,
+                                vx: (dx / dist) * projSpeed,
+                                vy: (dy / dist) * projSpeed,
+                                radius: 7
+                            });
+                            enemy.state = "chase";
+                            enemy.stateTimer = 0;
+                        }
+                    }
+                }
+            });
+
+            // 3. 투사체 이동 및 패링/충돌 판정
+            projectiles.forEach((p, pIdx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // 맵 밖으로 나가면 삭제
+                if (p.x < -20 || p.x > canvas.width + 20 || p.y < -20 || p.y > canvas.height + 20) {
+                    projectiles.splice(pIdx, 1);
+                    return;
+                }
+
+                let pdx = player.x - p.x;
+                let pdy = player.y - p.y;
+                let pDist = Math.hypot(pdx, pdy);
+
+                // 판정 범위 내 들어왔을 때
+                if (pDist < player.radius + p.radius + 8) {
+                    if (player.isParrying) {
+                        // ★ 원거리 투사체 패링 성공! ★
+                        screenShake = 16;
+                        score += 150;
+
+                        // 날아온 투사체의 속도 방향대로 플레이어가 묵직하게 뒤로 밀려남
+                        let pSpeed = Math.hypot(p.vx, p.vy) || 1;
+                        player.vx = (p.vx / pSpeed) * 24;
+                        player.vy = (p.vy / pSpeed) * 24;
+
+                        createParticles(p.x, p.y, "#00ffff", 25);
+                        addDamageText(player.x, player.y - 25, "RANGED PARRY!", "#00ffff");
+
+                        projectiles.splice(pIdx, 1);
+                        openSkillMenu();
+                    } else if (pDist < player.radius + p.radius) {
+                        // 원거리 투사체 피격
+                        player.hp = Math.max(0, player.hp - 12);
+                        screenShake = 8;
+                        addDamageText(player.x, player.y - 20, "-12 HP", "#ff0055");
+                        createParticles(p.x, p.y, "#ff0055", 10);
+
+                        player.vx = p.vx * 0.7;
+                        player.vy = p.vy * 0.7;
+
+                        projectiles.splice(pIdx, 1);
                     }
                 }
             });
@@ -444,16 +517,15 @@ game_html = """
             enemies = enemies.filter(e => {
                 if (e.hp <= 0) {
                     createParticles(e.x, e.y, "#ff3366", 20);
-                    score += 100;
+                    score += 120;
                     return false;
                 }
                 return true;
             });
 
-            // 화면 흔들림
             if (screenShake > 0) screenShake *= 0.85;
 
-            // 파티클 업데이트
+            // 파티클 & 텍스트 업데이트
             particles.forEach((p, i) => {
                 p.x += p.vx;
                 p.y += p.vy;
@@ -461,7 +533,6 @@ game_html = """
                 if (p.life <= 0) particles.splice(i, 1);
             });
 
-            // 데미지 텍스트 업데이트
             damageTexts.forEach((dt, i) => {
                 dt.y -= 0.8;
                 dt.life--;
@@ -477,7 +548,7 @@ game_html = """
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 격자 배경그리기
+            // 격자 배경
             ctx.strokeStyle = "#1f1f2e";
             ctx.lineWidth = 1;
             for (let x = 0; x < canvas.width; x += 40) {
@@ -492,25 +563,49 @@ game_html = """
                 ctx.beginPath();
                 ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
 
-                if (enemy.freezeTimer > 0) ctx.fillStyle = "#00e5ff"; // 빙결 상태
-                else if (enemy.state === "chase") ctx.fillStyle = "#ff4444";
-                else if (enemy.state === "windup") ctx.fillStyle = "#ffbb00"; // 경고
-                else if (enemy.state === "attack") ctx.fillStyle = "#ff0055"; // 공격
-                else ctx.fillStyle = "#555566"; // 스턴
+                if (enemy.freezeTimer > 0) ctx.fillStyle = "#00e5ff"; // 빙결
+                else if (enemy.type === "melee") {
+                    if (enemy.state === "chase") ctx.fillStyle = "#ff4444";
+                    else if (enemy.state === "windup") ctx.fillStyle = "#ffbb00";
+                    else if (enemy.state === "attack") ctx.fillStyle = "#ff0055";
+                    else ctx.fillStyle = "#555566";
+                } else if (enemy.type === "ranged") {
+                    if (enemy.state === "chase") ctx.fillStyle = "#a855f7"; // 보라색 (원거리 적)
+                    else if (enemy.state === "windup") ctx.fillStyle = "#ff9900"; // 차징
+                    else ctx.fillStyle = "#555566";
+                }
 
                 ctx.fill();
-                ctx.strokeStyle = "#fff";
+                ctx.strokeStyle = enemy.type === "ranged" ? "#e9d5ff" : "#ffffff";
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
 
                 // 적 HP 바
                 ctx.fillStyle = "rgba(0,0,0,0.5)";
-                ctx.fillRect(enemy.x - 15, enemy.y - 25, 30, 4);
+                ctx.fillRect(enemy.x - 15, enemy.y - 22, 30, 4);
                 ctx.fillStyle = "#ff3366";
-                ctx.fillRect(enemy.x - 15, enemy.y - 25, Math.max(0, (enemy.hp / enemy.maxHp) * 30), 4);
+                ctx.fillRect(enemy.x - 15, enemy.y - 22, Math.max(0, (enemy.hp / enemy.maxHp) * 30), 4);
             });
 
-            // 2. 플레이어 그리기
+            // 2. 투사체 그리기
+            projectiles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = "#ff00cc";
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 광원 효과
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius + 4, 0, Math.PI * 2);
+                ctx.strokeStyle = "rgba(255, 0, 204, 0.4)";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // 3. 플레이어 그리기
             ctx.beginPath();
             ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
             ctx.fillStyle = player.isParrying ? "#00ffff" : "#3388ff";
@@ -528,7 +623,7 @@ game_html = """
                 ctx.stroke();
             }
 
-            // 3. 파티클 그리기
+            // 4. 파티클 그리기
             particles.forEach(p => {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -536,7 +631,7 @@ game_html = """
                 ctx.fill();
             });
 
-            // 4. 데미지 텍스트
+            // 5. 데미지 텍스트
             damageTexts.forEach(dt => {
                 ctx.fillStyle = dt.color;
                 ctx.font = "bold 15px sans-serif";
@@ -546,7 +641,6 @@ game_html = """
             ctx.restore();
 
             // HUD
-            // 플레이어 HP 바
             ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
             ctx.fillRect(20, 20, 200, 16);
             ctx.fillStyle = "#00ff88";
@@ -566,7 +660,7 @@ game_html = """
             requestAnimationFrame(gameLoop);
         }
 
-        // 게임 시작
+        // 초기 시작 적 생성
         spawnEnemy();
         spawnEnemy();
         gameLoop();
