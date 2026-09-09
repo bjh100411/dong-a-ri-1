@@ -35,7 +35,6 @@ game_html = """
             background-color: #161622;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
-        /* 패시브 선택 UI */
         #upgrade-ui {
             display: none;
             position: absolute;
@@ -114,14 +113,13 @@ game_html = """
         });
         window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
-        // 플레이어 스탯 및 무적 타이머 추가
         let player = {
             x: 400, y: 250,
             radius: 18, speed: 3.8, vx: 0, vy: 0,
             hp: 100, maxHp: 100,
             isParrying: false, parryTimer: 0, parryCooldown: 0,
             damageMult: 1.0,
-            invincibleTimer: 0 // 무적 타임 추가
+            invincibleTimer: 0
         };
 
         let isPaused = false;
@@ -129,10 +127,10 @@ game_html = """
         let projectiles = [];
         let particles = [];
         let damageTexts = [];
-        let effectRings = []; // 파이어스톰 & 패링 충격파 통합
+        let effectRings = []; 
         let chests = [];
         let screenShake = 0;
-        let screenFlash = { timer: 0, color: "" }; // 스킬 발동 시 화면 번쩍임 효과
+        let screenFlash = { timer: 0, color: "" };
         let score = 0;
         
         let stage = 1;
@@ -153,7 +151,6 @@ game_html = """
             { id: "heal", title: "🧪 즉시 회복", desc: "체력 50 회복", action: () => { player.hp = Math.min(player.maxHp, player.hp + 50); } }
         ];
 
-        // 콤보 발동 스킬 풀
         const SKILL_POOL = [
             {
                 name: "⚡천둥 벼락",
@@ -193,7 +190,7 @@ game_html = """
                     enemies.forEach(e => {
                         let dmg = 50 * player.damageMult;
                         e.hp -= dmg;
-                        if (e.type !== "boss") e.freezeTimer = 60; // 1초 빙결
+                        if (e.type !== "boss") e.freezeTimer = 60; 
                         else e.freezeTimer = 20;
                         addDamageText(e.x, e.y - 20, Math.floor(dmg), "#88ffff", 60);
                         createParticles(e.x, e.y, "#88ffff", 15);
@@ -258,24 +255,21 @@ game_html = """
             addDamageText(player.x, player.y - 45, "🔥파이어 스톰!🔥", "#ff4400");
         }
 
-        // 광역 패링 로직
         function executeParry(sourceX, sourceY, isBoss) {
-            player.isParrying = false; // 중복 발동 방지
+            player.isParrying = false; 
             player.parryTimer = 0;
-            player.invincibleTimer = 45; // 0.75초 무적 타임 부여!
+            player.invincibleTimer = 45; 
             
             screenShake = 20;
             createParticles(player.x, player.y, "#00ffff", 40);
             addDamageText(player.x, player.y - 25, "PERFECT PARRY!", "#00ffff", 50);
             
-            // 패링 충격파 이펙트 생성
             effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 180, life: 20, maxLife: 20, color: "0, 255, 255" });
 
             let parryRadius = 180;
             let pDmg = (isBoss ? 150 : 60) * player.damageMult;
             score += isBoss ? 1000 : 200;
 
-            // 광역 적 피해 및 기절
             enemies.forEach(e => {
                 if (Math.hypot(e.x - player.x, e.y - player.y) < parryRadius) {
                     e.hp -= pDmg;
@@ -290,7 +284,6 @@ game_html = """
                 }
             });
 
-            // 광역 투사체 파괴
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 if (Math.hypot(p.x - player.x, p.y - player.y) < parryRadius) {
@@ -299,30 +292,28 @@ game_html = """
                 }
             }
 
-            // 플레이어 밀려남 (안전 확보)
             let pushAngle = Math.atan2(player.y - sourceY, player.x - sourceX);
             player.vx = Math.cos(pushAngle) * 15;
             player.vy = Math.sin(pushAngle) * 15;
 
-            // 스킬 콤보 로직 연동
             onParrySuccess();
         }
 
         function onParrySuccess() {
             parryCombo++;
-            comboTimer = 180; // 3초간 콤보 유지
+            comboTimer = 180; 
 
-            // 콤보 2회마다 확실하게 스킬 발동
             if (parryCombo >= 2) {
                 let randomSkill = SKILL_POOL[Math.floor(Math.random() * SKILL_POOL.length)];
                 randomSkill.action();
                 addDamageText(player.x, player.y - 45, "⭐" + randomSkill.name + " 연계기!⭐", "#ffff00", 80);
-                parryCombo = 0; // 발동 후 콤보 초기화
+                parryCombo = 0; 
             }
         }
 
+        // 버그 픽스: 텍스트를 무조건 문자열(String) 타입으로 변환하여 오류 방지
         function addDamageText(x, y, text, color, life=40) {
-            damageTexts.push({ x, y, text, color, life: life, opacity: 1 });
+            damageTexts.push({ x, y, text: String(text), color, life: life, opacity: 1 });
         }
 
         function createParticles(x, y, color, count = 15) {
@@ -360,7 +351,6 @@ game_html = """
             if (fireCooldown > 0) fireCooldown--;
             if (player.invincibleTimer > 0) player.invincibleTimer--;
 
-            // 이동 처리
             let moveX = 0, moveY = 0;
             if (keys["KeyW"]) moveY -= 1; if (keys["KeyS"]) moveY += 1;
             if (keys["KeyA"]) moveX -= 1; if (keys["KeyD"]) moveX += 1;
@@ -385,7 +375,6 @@ game_html = """
                 }
             });
 
-            // 적 행동 제어
             enemies.forEach((enemy) => {
                 if (enemy.burnTimer > 0) {
                     enemy.burnTimer--;
@@ -408,9 +397,8 @@ game_html = """
                         if (enemy.stateTimer > 25) { enemy.state = "attack"; enemy.stateTimer = 0; }
                     } else if (enemy.state === "attack") {
                         if (player.isParrying && dist < 120) { 
-                            executeParry(enemy.x, enemy.y, false); // 광역 패링 발동!
+                            executeParry(enemy.x, enemy.y, false); 
                         } else if (enemy.stateTimer > 8) {
-                            // 무적 타임이 아닐 때만 피격 처리
                             if (dist < 90 && player.invincibleTimer <= 0) { 
                                 player.hp = Math.max(0, player.hp - 15); screenShake = 10;
                                 addDamageText(player.x, player.y - 20, "-15 HP", "#ff0000");
@@ -453,8 +441,8 @@ game_html = """
                             screenShake = 25;
                             if (dist < 150) { 
                                 if (player.isParrying) {
-                                    executeParry(enemy.x, enemy.y, true); // 보스 패턴 패링
-                                } else if (player.invincibleTimer <= 0) { // 무적 아닐 때만 타격
+                                    executeParry(enemy.x, enemy.y, true); 
+                                } else if (player.invincibleTimer <= 0) { 
                                     player.hp = Math.max(0, player.hp - 35);
                                     addDamageText(player.x, player.y - 20, "-35 HP", "#ff0000");
                                 }
@@ -467,24 +455,26 @@ game_html = """
                 }
             });
 
-            // 투사체 처리
-            projectiles.forEach((p, pIdx) => {
+            // 버그 픽스: 역순 순회 방식을 통한 안전한 요소 삭제
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
                 p.x += p.vx; p.y += p.vy;
-                if (p.x < -20 || p.x > canvas.width + 20 || p.y < -20 || p.y > canvas.height + 20) { projectiles.splice(pIdx, 1); return; }
+                if (p.x < -20 || p.x > canvas.width + 20 || p.y < -20 || p.y > canvas.height + 20) { projectiles.splice(i, 1); continue; }
+                
                 let pDist = Math.hypot(player.x - p.x, player.y - p.y);
                 if (pDist < player.radius + p.radius + 35) {
                     if (player.isParrying) {
-                        executeParry(p.x, p.y, p.type === "boss_proj"); // 투사체 광역 패링
+                        executeParry(p.x, p.y, p.type === "boss_proj");
                     } else if (pDist < player.radius + p.radius && player.invincibleTimer <= 0) {
                         let dmg = p.type === "boss_proj" ? 20 : 12;
                         player.hp = Math.max(0, player.hp - dmg);
                         screenShake = 8;
                         addDamageText(player.x, player.y - 20, `-${dmg} HP`, "#ff0055");
                         createParticles(p.x, p.y, "#ff0055", 10);
-                        projectiles.splice(pIdx, 1);
+                        projectiles.splice(i, 1);
                     }
                 }
-            });
+            }
 
             let bossDiedThisFrame = false; let bossDeathPos = {x:0, y:0};
             enemies = enemies.filter(e => {
@@ -514,9 +504,24 @@ game_html = """
 
             if (screenShake > 0) screenShake *= 0.85;
 
-            particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.life--; if (p.life <= 0) particles.splice(i, 1); });
-            damageTexts.forEach((dt, i) => { dt.y -= 0.8; dt.life--; if (dt.life <= 0) damageTexts.splice(i, 1); });
-            effectRings.forEach((r, i) => { r.radius += (r.maxRadius - r.radius) * 0.2; r.life--; if (r.life <= 0) effectRings.splice(i, 1); });
+            // 시각 효과 객체들도 역순 순회로 안전하게 처리
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+            
+            for (let i = damageTexts.length - 1; i >= 0; i--) {
+                let dt = damageTexts[i];
+                dt.y -= 0.8; dt.life--;
+                if (dt.life <= 0) damageTexts.splice(i, 1);
+            }
+
+            for (let i = effectRings.length - 1; i >= 0; i--) {
+                let r = effectRings[i];
+                r.radius += (r.maxRadius - r.radius) * 0.2; r.life--;
+                if (r.life <= 0) effectRings.splice(i, 1);
+            }
         }
 
         function draw() {
@@ -524,12 +529,10 @@ game_html = """
             if (screenShake > 0.5) ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 격자 배경
             ctx.strokeStyle = "#1f1f2e"; ctx.lineWidth = 1;
             for (let x = 0; x < canvas.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
             for (let y = 0; y < canvas.height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
 
-            // 스킬 발동 시 화면 번쩍임 효과
             if (screenFlash.timer > 0) {
                 ctx.fillStyle = screenFlash.color;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -544,7 +547,6 @@ game_html = """
                 ctx.strokeStyle = "rgba(255, 204, 0, 0.5)"; ctx.lineWidth = 3; ctx.stroke();
             });
 
-            // 이펙트 링 그리기 (파이어스톰 & 패링 충격파)
             effectRings.forEach(r => {
                 ctx.beginPath(); ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
                 ctx.strokeStyle = `rgba(${r.color}, ${r.life / r.maxLife})`; ctx.lineWidth = 10; ctx.stroke();
@@ -577,7 +579,6 @@ game_html = """
                 ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
             });
 
-            // 플레이어 그리기 (무적 시 깜빡임 효과)
             if (player.invincibleTimer > 0) {
                 ctx.globalAlpha = 0.4 + Math.abs(Math.sin(Date.now() / 80)) * 0.6;
             }
@@ -585,7 +586,7 @@ game_html = """
             ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
             ctx.fillStyle = player.isParrying ? "#00ffff" : (player.invincibleTimer > 0 ? "#ffffff" : "#3388ff");
             ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
-            ctx.globalAlpha = 1.0; // 투명도 롤백
+            ctx.globalAlpha = 1.0; 
 
             if (player.isParrying) {
                 ctx.beginPath(); ctx.arc(player.x, player.y, player.radius + 18, 0, Math.PI * 2); 
@@ -609,7 +610,6 @@ game_html = """
 
             ctx.restore();
 
-            // HUD
             ctx.fillStyle = "rgba(255, 255, 255, 0.1)"; ctx.fillRect(20, 20, 200, 16);
             ctx.fillStyle = "#00ff88"; ctx.fillRect(20, 20, (player.hp / player.maxHp) * 200, 16);
             ctx.strokeStyle = "#fff"; ctx.strokeRect(20, 20, 200, 16);
@@ -625,7 +625,6 @@ game_html = """
             ctx.fillStyle = shiftReady ? "#ff4400" : "#888888";
             ctx.fillText(`SHIFT (불공격) : ${shiftReady ? "READY!" : (fireCooldown/60).toFixed(1) + "s"}`, 20, 95);
 
-            // 콤보 시스템 HUD 추가
             if (comboTimer > 0 && parryCombo > 0) {
                 ctx.fillStyle = "#ffff00";
                 ctx.font = "bold 16px sans-serif";
