@@ -1,10 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Action Roguelite - Final Fix", page_icon="⚔️", layout="centered")
+st.set_page_config(page_title="Action Roguelite - Optimized", page_icon="⚔️", layout="centered")
 
-st.title("⚔️ 광역 패링 & 스킬 콤보 액션 (최종 수정판)")
-st.caption("WASD: 이동 | Spacebar: 패링 | Shift: 불공격 | 보스 처치 시 다음 스테이지 이동")
+st.title("⚔️ 광역 패링 액션 (랙 원인 완전 제거 및 적 공격 표시 추가)")
+st.caption("WASD: 이동 | Spacebar: 패링 | Shift: 불공격 | 파란색 원거리 적 & 보스 공격 전조 표시 기능 추가")
 
 game_html = """
 <!DOCTYPE html>
@@ -227,7 +227,7 @@ game_html = """
         let isGameOver = false;
         let enemies = [], projectiles = [], particles = [], damageTexts = [], effectRings = [], chests = [];
         let screenShake = 0, screenFlash = { timer: 0, color: "" }, score = 0;
-        let stage = 1, stageKills = 0, nextBossTarget = 25, isBossAlive = false;
+        let stage = 1, stageKills = 0, nextBossTarget = 20, isBossAlive = false;
         let parryCombo = 0, comboTimer = 0, fireCooldown = 0, baseFireCooldown = 300; 
 
         function initGame() {
@@ -247,7 +247,7 @@ game_html = """
             damageTexts = []; effectRings = []; chests = [];
             screenShake = 0; screenFlash = { timer: 0, color: "" };
             score = 0; stage = 1; stageKills = 0;
-            nextBossTarget = 25; isBossAlive = false;
+            nextBossTarget = 20; isBossAlive = false;
             parryCombo = 0; comboTimer = 0;
             fireCooldown = 0; baseFireCooldown = 300;
             keys = {};
@@ -275,47 +275,31 @@ game_html = """
             {
                 name: "⚡천둥 벼락",
                 action: () => {
-                    screenFlash = { timer: 15, color: "rgba(0, 255, 255, 0.4)" };
-                    screenShake = 20;
+                    screenFlash = { timer: 10, color: "rgba(0, 255, 255, 0.3)" };
+                    screenShake = 15;
                     enemies.forEach(e => {
                         let isCrit = Math.random() < player.criticalRate;
                         let dmg = 80 * player.damageMult * (isCrit ? 1.5 : 1.0);
                         e.hp -= dmg;
-                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#00ffff", 35);
-                        createParticles(e.x, e.y, "#00ffff", 6);
+                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#00ffff", 25);
                     });
                 }
             },
             {
                 name: "💥폭발 쇼크웨이브",
                 action: () => {
-                    screenFlash = { timer: 15, color: "rgba(255, 85, 0, 0.4)" };
-                    screenShake = 25;
-                    effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 400, life: 30, maxLife: 30, color: "255, 85, 0" });
+                    screenFlash = { timer: 10, color: "rgba(255, 85, 0, 0.3)" };
+                    screenShake = 20;
+                    effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 350, life: 20, maxLife: 20, color: "255, 85, 0" });
                     enemies.forEach(e => {
                         let dx = e.x - player.x; let dy = e.y - player.y; let dist = Math.hypot(dx, dy) || 1;
-                        if (dist < 400) {
+                        if (dist < 350) {
                             let isCrit = Math.random() < player.criticalRate;
                             let dmg = 100 * player.damageMult * (isCrit ? 1.5 : 1.0);
                             e.hp -= dmg;
-                            if (e.type !== "boss") { e.x += (dx/dist)*150; e.y += (dy/dist)*150; e.state = "stun"; e.stateTimer = 0; }
-                            addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#ff5500", 35);
-                            createParticles(e.x, e.y, "#ff5500", 8);
+                            if (e.type !== "boss") { e.x += (dx/dist)*100; e.y += (dy/dist)*100; e.state = "stun"; e.stateTimer = 0; }
+                            addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#ff5500", 25);
                         }
-                    });
-                }
-            },
-            {
-                name: "❄️빙결 파동",
-                action: () => {
-                    screenFlash = { timer: 15, color: "rgba(136, 255, 255, 0.4)" };
-                    enemies.forEach(e => {
-                        let isCrit = Math.random() < player.criticalRate;
-                        let dmg = 50 * player.damageMult * (isCrit ? 1.5 : 1.0);
-                        e.hp -= dmg;
-                        if (e.type !== "boss") e.freezeTimer = 60; else e.freezeTimer = 20;
-                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#88ffff", 35);
-                        createParticles(e.x, e.y, "#88ffff", 6);
                     });
                 }
             }
@@ -323,37 +307,37 @@ game_html = """
 
         function spawnEnemy() {
             if (isPaused || isGameOver) return;
-            let maxEnemies = 8 + (stage * 2); 
+            let maxEnemies = 6 + (stage * 2); 
             if (enemies.length >= maxEnemies || isBossAlive) return;
 
             let x = Math.random() < 0.5 ? (Math.random() < 0.5 ? -20 : canvas.width + 20) : Math.random() * canvas.width;
             let y = Math.random() < 0.5 ? Math.random() * canvas.height : (Math.random() < 0.5 ? -20 : canvas.height + 20);
 
             let randType = Math.random();
-            let isRanged = randType < 0.35;
-            let isTank = randType >= 0.35 && randType < 0.5;
-            let hpMult = 1 + (stage - 1) * 0.4;
+            let isRanged = randType < 0.4; // 파란색 원거리 적
+            let isTank = randType >= 0.4 && randType < 0.55;
+            let hpMult = 1 + (stage - 1) * 0.3;
             
             enemies.push({
                 x, y, 
                 type: isTank ? "tank" : (isRanged ? "ranged" : "melee"), 
                 radius: isTank ? 22 : (isRanged ? 14 : 16),
-                hp: (isTank ? 200 : (isRanged ? 80 : 120)) * hpMult, 
-                maxHp: (isTank ? 200 : (isRanged ? 80 : 120)) * hpMult,
-                speed: isTank ? 0.9 : (isRanged ? 1.1 : (1.5 + stage * 0.1)),
+                hp: (isTank ? 180 : (isRanged ? 70 : 100)) * hpMult, 
+                maxHp: (isTank ? 180 : (isRanged ? 70 : 100)) * hpMult,
+                speed: isTank ? 0.9 : (isRanged ? 1.0 : (1.4 + stage * 0.05)),
                 state: "chase", stateTimer: 0, freezeTimer: 0, burnTimer: 0
             });
         }
-        setInterval(spawnEnemy, 1600);
+        setInterval(spawnEnemy, 1800);
 
         function spawnBoss() {
             isBossAlive = true;
-            addDamageText(canvas.width/2, canvas.height/2, "⚠️ WARNING: BOSS INCOMING ⚠️", "#ff0000", 100);
-            screenShake = 30;
-            let hpMult = 1 + (stage - 1) * 0.7;
+            addDamageText(canvas.width/2, canvas.height/2, "⚠️ WARNING: BOSS INCOMING ⚠️", "#ff0000", 80);
+            screenShake = 25;
+            let hpMult = 1 + (stage - 1) * 0.5;
             enemies.push({
                 x: canvas.width / 2, y: -50, type: "boss", radius: 35,
-                hp: 1200 * hpMult, maxHp: 1200 * hpMult, speed: 1.5,
+                hp: 1000 * hpMult, maxHp: 1000 * hpMult, speed: 1.3,
                 state: "enter", stateTimer: 0, freezeTimer: 0, burnTimer: 0, patternIndex: 0
             });
         }
@@ -365,102 +349,86 @@ game_html = """
         }
 
         function triggerFireAttack() {
-            fireCooldown = baseFireCooldown; screenShake = 18;
-            effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 280, life: 25, maxLife: 25, color: "255, 68, 0" });
-            createParticles(player.x, player.y, "#ff4400", 20);
+            fireCooldown = baseFireCooldown; screenShake = 15;
+            effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 250, life: 20, maxLife: 20, color: "255, 68, 0" });
+            createParticles(player.x, player.y, "#ff4400", 10);
             
             let dmg = 50 * player.damageMult;
             enemies.forEach(e => {
-                if (Math.hypot(e.x - player.x, e.y - player.y) < 280) {
-                    e.hp -= dmg; e.burnTimer = 240;
-                    addDamageText(e.x, e.y - 20, "FIRE!", "#ffaa00", 25);
+                if (Math.hypot(e.x - player.x, e.y - player.y) < 250) {
+                    e.hp -= dmg; e.burnTimer = 180;
+                    addDamageText(e.x, e.y - 20, "FIRE!", "#ffaa00", 20);
                 }
             });
-            addDamageText(player.x, player.y - 45, "🔥파이어 스톰!🔥", "#ff4400", 45);
+            addDamageText(player.x, player.y - 45, "🔥파이어 스톰!🔥", "#ff4400", 40);
         }
 
         function executeParry(sourceX, sourceY, isBoss) {
-            player.isParrying = false; player.parryTimer = 0; player.invincibleTimer = 45; 
-            screenShake = isBoss ? 25 : 15;
-            createParticles(player.x, player.y, "#00ffff", 15);
-            addDamageText(player.x, player.y - 25, "PERFECT PARRY!", "#00ffff", 35);
-            effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 180, life: 20, maxLife: 20, color: "0, 255, 255" });
+            player.isParrying = false; player.parryTimer = 0; player.invincibleTimer = 40; 
+            screenShake = isBoss ? 20 : 12;
+            createParticles(player.x, player.y, "#00ffff", 10);
+            addDamageText(player.x, player.y - 25, "PERFECT PARRY!", "#00ffff", 30);
+            effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 150, life: 15, maxLife: 15, color: "0, 255, 255" });
 
-            let parryRadius = 180;
-            let pDmg = (isBoss ? 160 : 70) * player.damageMult;
+            let parryRadius = 160;
+            let pDmg = (isBoss ? 150 : 60) * player.damageMult;
             score += isBoss ? 1000 : 200;
 
-            let hitCount = 0;
             enemies.forEach(e => {
                 let dist = Math.hypot(e.x - player.x, e.y - player.y);
                 if (dist < parryRadius) {
                     e.hp -= pDmg;
-                    hitCount++;
-                    if (hitCount <= 4) {
-                        addDamageText(e.x, e.y - 15, "PARRIED!", "#00ffff", 25);
-                    }
                     if (e.type !== "boss") {
                         e.state = "stun"; e.stateTimer = 0;
                         let pushAngle = Math.atan2(e.y - player.y, e.x - player.x);
-                        e.x += Math.cos(pushAngle) * 35; e.y += Math.sin(pushAngle) * 35;
+                        e.x += Math.cos(pushAngle) * 30; e.y += Math.sin(pushAngle) * 30;
                     }
                 }
             });
 
-            // 투사체 정리 시 렉 유발 방지를 위해 개수 제한
-            let removedProj = 0;
+            // 투사체 즉시 제거 (랙 방지)
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 if (Math.hypot(p.x - player.x, p.y - player.y) < parryRadius) {
                     projectiles.splice(i, 1);
-                    removedProj++;
-                    if (removedProj > 15) break; // 한 번에 너무 많은 투사체 삭제 연산 방지
                 }
             }
 
-            let pushAngle = Math.atan2(player.y - sourceY, player.x - sourceX);
-            player.vx = Math.cos(pushAngle) * 12; player.vy = Math.sin(pushAngle) * 12;
-
-            // 🦇 패링 성공 시 8% 확률로 뱀파이어 흡혈 특수 공격 발동
+            // 🦇 패링 성공 시 8% 확률로 흡혈 특수 공격
             if (Math.random() < 0.08) {
-                player.hp = Math.min(player.maxHp, player.hp + 45);
-                screenFlash = { timer: 20, color: "rgba(255, 0, 85, 0.4)" };
-                effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 320, life: 25, maxLife: 25, color: "255, 0, 85" });
+                player.hp = Math.min(player.maxHp, player.hp + 40);
+                screenFlash = { timer: 15, color: "rgba(255, 0, 85, 0.3)" };
+                effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 280, life: 20, maxLife: 20, color: "255, 0, 85" });
                 enemies.forEach(e => {
-                    let d = Math.hypot(e.x - player.x, e.y - player.y);
-                    if (d < 320) {
-                        let vDmg = 130 * player.damageMult;
+                    if (Math.hypot(e.x - player.x, e.y - player.y) < 280) {
+                        let vDmg = 120 * player.damageMult;
                         e.hp -= vDmg;
-                        addDamageText(e.x, e.y - 20, "VAMPIRE! -" + Math.floor(vDmg), "#ff0055", 35);
+                        addDamageText(e.x, e.y - 20, "VAMPIRE!", "#ff0055", 30);
                     }
                 });
-                addDamageText(player.x, player.y - 50, "🦇 뱀파이어 블러드 흡혈 특수기! (+45 HP) 🦇", "#ff0055", 70);
+                addDamageText(player.x, player.y - 50, "🦇 뱀파이어 블러드 특수기! (+40 HP) 🦇", "#ff0055", 50);
             }
 
-            onParrySuccess();
-        }
-
-        function onParrySuccess() {
-            parryCombo++; comboTimer = 180; 
+            parryCombo++; comboTimer = 180;
             if (parryCombo >= 2) {
                 let randomSkill = SKILL_POOL[Math.floor(Math.random() * SKILL_POOL.length)];
                 randomSkill.action();
-                addDamageText(player.x, player.y - 45, "⭐" + randomSkill.name + " 연계기!⭐", "#ffff00", 50);
-                parryCombo = 0; 
+                addDamageText(player.x, player.y - 45, "⭐" + randomSkill.name + " 연계기!⭐", "#ffff00", 40);
+                parryCombo = 0;
             }
         }
 
-        function addDamageText(x, y, text, color, life=30) {
-            if (damageTexts.length > 25) damageTexts.shift();
-            damageTexts.push({ x, y, text: String(text), color, life: life, opacity: 1 });
+        function addDamageText(x, y, text, color, life=25) {
+            if (damageTexts.length > 15) damageTexts.shift();
+            damageTexts.push({ x, y, text: String(text), color, life: life });
         }
 
-        function createParticles(x, y, color, count = 8) {
-            if (particles.length > 100) return;
+        function createParticles(x, y, color, count = 5) {
+            if (particles.length > 40) return; // 파티클 최대 제한으로 렉 원인 차단
             for (let i = 0; i < count; i++) {
                 particles.push({
-                    x, y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
-                    size: Math.random() * 3 + 2, color: color, life: 12 + Math.random() * 8
+                    x, y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+                    size: Math.random() * 3 + 2, color: color, life: 10 + Math.random() * 5
                 });
             }
         }
@@ -504,9 +472,6 @@ game_html = """
             if (moveX !== 0 && moveY !== 0) { moveX *= 0.7071; moveY *= 0.7071; }
 
             player.x += moveX * player.speed; player.y += moveY * player.speed;
-            player.x += player.vx; player.y += player.vy;
-            player.vx *= 0.82; player.vy *= 0.82;
-
             player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
             player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
@@ -518,10 +483,7 @@ game_html = """
             enemies.forEach((enemy) => {
                 if (enemy.burnTimer > 0) {
                     enemy.burnTimer--;
-                    if (enemy.burnTimer % 30 === 0) {
-                        let bDmg = 15 * player.damageMult; enemy.hp -= bDmg;
-                        addDamageText(enemy.x, enemy.y - 10, "-" + Math.floor(bDmg), "#ff4400", 20);
-                    }
+                    if (enemy.burnTimer % 30 === 0) { enemy.hp -= 12 * player.damageMult; }
                 }
                 if (enemy.freezeTimer > 0) { enemy.freezeTimer--; return; }
 
@@ -534,31 +496,34 @@ game_html = """
                         enemy.x += (dx / dist) * enemy.speed; enemy.y += (dy / dist) * enemy.speed;
                         if (dist < attackRange) { enemy.state = "windup"; enemy.stateTimer = 0; }
                     } else if (enemy.state === "windup") {
-                        if (enemy.stateTimer > (enemy.type === "tank" ? 35 : 25)) { enemy.state = "attack"; enemy.stateTimer = 0; }
+                        if (enemy.stateTimer > 25) { enemy.state = "attack"; enemy.stateTimer = 0; }
                     } else if (enemy.state === "attack") {
-                        if (player.isParrying && dist < attackRange + 35) { 
+                        if (player.isParrying && dist < attackRange + 30) { 
                             executeParry(enemy.x, enemy.y, false); 
                         } else if (enemy.stateTimer > 8) {
                             if (dist < attackRange + 15 && player.invincibleTimer <= 0) { 
-                                let hitDmg = enemy.type === "tank" ? 25 : 15;
-                                player.hp -= hitDmg; screenShake = enemy.type === "tank" ? 15 : 10;
+                                let hitDmg = enemy.type === "tank" ? 22 : 12;
+                                player.hp -= hitDmg; screenShake = 10;
                                 addDamageText(player.x, player.y - 20, `-${hitDmg} HP`, "#ff0000");
-                                player.vx = (dx / dist) * 10; player.vy = (dy / dist) * 10;
                             }
                             enemy.state = "stun"; enemy.stateTimer = 0;
                         }
                     } else if (enemy.state === "stun") {
-                        if (enemy.stateTimer > 40) { enemy.state = "chase"; enemy.stateTimer = 0; }
+                        if (enemy.stateTimer > 35) { enemy.state = "chase"; enemy.stateTimer = 0; }
                     }
                 } else if (enemy.type === "ranged") {
-                    let idealDist = 220;
+                    // 파란색 원거리 적 AI 및 공격 전조 표시
+                    let idealDist = 200;
                     if (enemy.state === "chase") {
-                        if (dist < idealDist - 30) { enemy.x -= (dx / dist) * enemy.speed; enemy.y -= (dy / dist) * enemy.speed; } 
-                        else if (dist > idealDist + 30) { enemy.x += (dx / dist) * enemy.speed; enemy.y += (dy / dist) * enemy.speed; }
+                        if (dist < idealDist - 20) { enemy.x -= (dx / dist) * enemy.speed; enemy.y -= (dy / dist) * enemy.speed; } 
+                        else if (dist > idealDist + 20) { enemy.x += (dx / dist) * enemy.speed; enemy.y += (dy / dist) * enemy.speed; }
+                        
+                        // 공격 타이밍이 다가오면 '준비 상태(windup)'로 전환
                         if (enemy.stateTimer > 70) { enemy.state = "windup"; enemy.stateTimer = 0; }
                     } else if (enemy.state === "windup") {
-                        if (enemy.stateTimer > 35) {
-                            let projSpeed = 5.5;
+                        // 멈춰 서서 에너지를 모으는 중 (이때 플레이어가 패링 준비를 해야 함)
+                        if (enemy.stateTimer > 40) {
+                            let projSpeed = 4.5;
                             projectiles.push({ x: enemy.x, y: enemy.y, type: "normal", vx: (dx / dist) * projSpeed, vy: (dy / dist) * projSpeed, radius: 7 });
                             enemy.state = "chase"; enemy.stateTimer = 0;
                         }
@@ -568,53 +533,34 @@ game_html = """
                         enemy.y += 2; if (enemy.y > 100) { enemy.state = "chase"; enemy.stateTimer = 0; }
                     } else if (enemy.state === "chase") {
                         enemy.x += (dx / dist) * enemy.speed; enemy.y += (dy / dist) * enemy.speed;
-                        if (enemy.stateTimer > 130) {
-                            let patterns = ["spread_windup", "slam_windup", "dash_windup"];
+                        if (enemy.stateTimer > 110) {
+                            let patterns = ["spread_windup", "slam_windup"];
                             enemy.patternIndex = Math.floor(Math.random() * patterns.length);
                             enemy.state = patterns[enemy.patternIndex];
                             enemy.stateTimer = 0;
                         }
                     } else if (enemy.state === "spread_windup") {
-                        if (enemy.stateTimer > 40) {
-                            for(let i=0; i<10; i++) {
-                                let angle = (Math.PI * 2 / 10) * i;
-                                projectiles.push({ x: enemy.x, y: enemy.y, type: "boss_proj", vx: Math.cos(angle) * 5, vy: Math.sin(angle) * 5, radius: 8 });
+                        if (enemy.stateTimer > 35) {
+                            for(let i=0; i<8; i++) {
+                                let angle = (Math.PI * 2 / 8) * i;
+                                projectiles.push({ x: enemy.x, y: enemy.y, type: "boss_proj", vx: Math.cos(angle) * 4.5, vy: Math.sin(angle) * 4.5, radius: 8 });
                             }
                             enemy.state = "chase"; enemy.stateTimer = 0;
                         }
                     } else if (enemy.state === "slam_windup") {
-                        if (enemy.stateTimer > 50) {
-                            screenShake = 25;
-                            if (dist < 160) { 
+                        if (enemy.stateTimer > 45) {
+                            screenShake = 20;
+                            if (dist < 150) { 
                                 if (player.isParrying) {
                                     executeParry(enemy.x, enemy.y, true); 
                                 } else if (player.invincibleTimer <= 0) { 
-                                    player.hp -= 35;
-                                    addDamageText(player.x, player.y - 20, "-35 HP", "#ff0000");
+                                    player.hp -= 30;
+                                    addDamageText(player.x, player.y - 20, "-30 HP", "#ff0000");
                                 }
                             }
-                            createParticles(enemy.x, enemy.y, "#ff0055", 15);
-                            effectRings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, maxRadius: 160, life: 15, maxLife: 15, color: "255, 0, 85" });
+                            effectRings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, maxRadius: 150, life: 15, maxLife: 15, color: "255, 0, 85" });
                             enemy.state = "chase"; enemy.stateTimer = 0;
                         }
-                    } else if (enemy.state === "dash_windup") {
-                        if (enemy.stateTimer > 30) {
-                            enemy.vx = (dx / dist) * 11;
-                            enemy.vy = (dy / dist) * 11;
-                            enemy.state = "dash_attack";
-                            enemy.stateTimer = 0;
-                        }
-                    } else if (enemy.state === "dash_attack") {
-                        enemy.x += enemy.vx; enemy.y += enemy.vy;
-                        if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < player.radius + enemy.radius) {
-                            if (player.isParrying) {
-                                executeParry(enemy.x, enemy.y, true);
-                            } else if (player.invincibleTimer <= 0) {
-                                player.hp -= 40;
-                                addDamageText(player.x, player.y - 20, "-40 HP", "#ff0000");
-                            }
-                        }
-                        if (enemy.stateTimer > 25) { enemy.state = "chase"; enemy.stateTimer = 0; }
                     }
                 }
             });
@@ -625,13 +571,13 @@ game_html = """
                 if (p.x < -20 || p.x > canvas.width + 20 || p.y < -20 || p.y > canvas.height + 20) { projectiles.splice(i, 1); continue; }
                 
                 let pDist = Math.hypot(player.x - p.x, player.y - p.y);
-                if (pDist < player.radius + p.radius + 35) {
+                if (pDist < player.radius + p.radius + 25) {
                     if (player.isParrying) {
                         executeParry(p.x, p.y, p.type === "boss_proj");
                     } else if (pDist < player.radius + p.radius && player.invincibleTimer <= 0) {
-                        let dmg = p.type === "boss_proj" ? 22 : 12;
+                        let dmg = p.type === "boss_proj" ? 20 : 10;
                         player.hp -= dmg;
-                        screenShake = 8;
+                        screenShake = 6;
                         addDamageText(player.x, player.y - 20, `-${dmg} HP`, "#ff0055");
                         projectiles.splice(i, 1);
                     }
@@ -641,11 +587,9 @@ game_html = """
             let bossDiedThisFrame = false; let bossDeathPos = {x:0, y:0};
             enemies = enemies.filter(e => {
                 if (e.hp <= 0) {
-                    createParticles(e.x, e.y, "#ff3366", 12); 
-                    score += (e.type === "boss" ? 2000 : (e.type === "tank" ? 250 : 120));
-                    if (player.vampireRate > 0) {
-                        player.hp = Math.min(player.maxHp, player.hp + player.vampireRate);
-                    }
+                    createParticles(e.x, e.y, "#ff3366", 8); 
+                    score += (e.type === "boss" ? 2000 : 150);
+                    if (player.vampireRate > 0) { player.hp = Math.min(player.maxHp, player.hp + player.vampireRate); }
                     if (e.type === "boss") { 
                         bossDiedThisFrame = true; 
                         bossDeathPos = {x: e.x, y: e.y}; 
@@ -658,23 +602,22 @@ game_html = """
                 return true;
             });
 
-            // 보스 처치 시 스테이지 클리어 및 다음 스테이지 진입
             if (bossDiedThisFrame) {
                 stage++;
                 chests.push({ x: bossDeathPos.x, y: bossDeathPos.y, radius: 20 });
                 addDamageText(bossDeathPos.x, bossDeathPos.y - 30, "보물상자 등장!", "#ffff00");
-                addDamageText(canvas.width/2, canvas.height/2, `STAGE ${stage} START!`, "#00ff88", 90);
+                addDamageText(canvas.width/2, canvas.height/2, `STAGE ${stage} START!`, "#00ff88", 70);
                 player.hp = Math.min(player.maxHp, player.hp + 40);
                 stageKills = 0;
-                nextBossTarget += 15; // 다음 보스 소환 요구 킬 수 증가
+                nextBossTarget += 10;
             }
 
             if (!isBossAlive && stageKills >= nextBossTarget) { spawnBoss(); }
 
-            if (screenShake > 0) screenShake *= 0.85;
+            if (screenShake > 0.5) screenShake *= 0.8;
 
             for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--; if (p.life <= 0) particles.splice(i, 1); }
-            for (let i = damageTexts.length - 1; i >= 0; i--) { let dt = damageTexts[i]; dt.y -= 0.8; dt.life--; if (dt.life <= 0) damageTexts.splice(i, 1); }
+            for (let i = damageTexts.length - 1; i >= 0; i--) { let dt = damageTexts[i]; dt.y -= 0.6; dt.life--; if (dt.life <= 0) damageTexts.splice(i, 1); }
             for (let i = effectRings.length - 1; i >= 0; i--) { let r = effectRings[i]; r.radius += (r.maxRadius - r.radius) * 0.2; r.life--; if (r.life <= 0) effectRings.splice(i, 1); }
         }
 
@@ -683,95 +626,103 @@ game_html = """
             if (screenShake > 0.5) ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = "#1f1f2e"; ctx.lineWidth = 1;
-            for (let x = 0; x < canvas.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
-            for (let y = 0; y < canvas.height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-
             if (screenFlash.timer > 0) { ctx.fillStyle = screenFlash.color; ctx.fillRect(0, 0, canvas.width, canvas.height); screenFlash.timer--; }
 
             chests.forEach(chest => {
                 ctx.fillStyle = "#ffcc00"; ctx.fillRect(chest.x - 15, chest.y - 10, 30, 20);
-                ctx.fillStyle = "#aa7700"; ctx.fillRect(chest.x - 15, chest.y - 2, 30, 4);
-                ctx.beginPath(); ctx.arc(chest.x, chest.y - 10, 15, Math.PI, 0); ctx.fill();
-                ctx.beginPath(); ctx.arc(chest.x, chest.y, chest.radius + 5 + Math.sin(Date.now()/100)*5, 0, Math.PI*2);
-                ctx.strokeStyle = "rgba(255, 204, 0, 0.5)"; ctx.lineWidth = 3; ctx.stroke();
+                ctx.beginPath(); ctx.arc(chest.x, chest.y, chest.radius + 5, 0, Math.PI*2);
+                ctx.strokeStyle = "rgba(255, 204, 0, 0.5)"; ctx.lineWidth = 2; ctx.stroke();
             });
 
             effectRings.forEach(r => {
                 ctx.beginPath(); ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(${r.color}, ${r.life / r.maxLife})`; ctx.lineWidth = 10; ctx.stroke();
+                ctx.strokeStyle = `rgba(${r.color}, ${r.life / r.maxLife})`; ctx.lineWidth = 6; ctx.stroke();
             });
 
+            // 적 렌더링 및 공격 전조(공격 종류와 타이밍) 표시
             enemies.forEach(enemy => {
                 ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-                if (enemy.freezeTimer > 0) ctx.fillStyle = "#00e5ff"; 
-                else if (enemy.burnTimer > 0 && Math.random() > 0.5) ctx.fillStyle = "#ff5500"; 
-                else if (enemy.type === "boss") { ctx.fillStyle = enemy.state.includes("windup") ? "#ff0000" : "#880000"; }
-                else if (enemy.type === "tank") { ctx.fillStyle = "#3b82f6"; }
-                else if (enemy.type === "melee") {
-                    if (enemy.state === "chase") ctx.fillStyle = "#ff4444"; else if (enemy.state === "windup") ctx.fillStyle = "#ffbb00";
-                    else if (enemy.state === "attack") ctx.fillStyle = "#ff0055"; else ctx.fillStyle = "#555566";
+                
+                if (enemy.type === "ranged") {
+                    // 파란색 원거리 적
+                    ctx.fillStyle = enemy.state === "windup" ? "#ffffff" : "#00bfff";
+                } else if (enemy.type === "tank") {
+                    ctx.fillStyle = "#3b82f6";
+                } else if (enemy.type === "boss") {
+                    ctx.fillStyle = enemy.state.includes("windup") ? "#ff0000" : "#880000";
                 } else {
-                    if (enemy.state === "chase") ctx.fillStyle = "#a855f7"; else if (enemy.state === "windup") ctx.fillStyle = "#ff9900"; 
-                    else ctx.fillStyle = "#555566";
+                    ctx.fillStyle = enemy.state === "windup" ? "#ffbb00" : "#ff4444";
                 }
                 ctx.fill();
-                ctx.strokeStyle = enemy.type === "boss" ? "#ffaa00" : (enemy.type === "tank" ? "#93c5fd" : (enemy.type === "ranged" ? "#e9d5ff" : "#ffffff"));
-                ctx.lineWidth = enemy.type === "boss" ? 3 : 1.5; ctx.stroke();
+                ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.stroke();
 
-                let hpWidth = enemy.type === "boss" ? 60 : (enemy.type === "tank" ? 40 : 30);
-                ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(enemy.x - hpWidth/2, enemy.y - enemy.radius - 8, hpWidth, 4);
-                ctx.fillStyle = "#ff3366"; ctx.fillRect(enemy.x - hpWidth/2, enemy.y - enemy.radius - 8, Math.max(0, (enemy.hp / enemy.maxHp) * hpWidth), 4);
+                // 🔵 파란색 원거리 적 또는 보스가 공격을 준비할 때 머리 위에 경고 표시
+                if (enemy.type === "ranged" && enemy.state === "windup") {
+                    ctx.fillStyle = "#00ffff";
+                    ctx.font = "bold 12px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText("⚡ 레이저 장전!", enemy.x, enemy.y - enemy.radius - 12);
+                    
+                    // 사격 궤도 예고선 살짝 표시
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.lineTo(player.x, player.y); ctx.stroke();
+                } else if (enemy.type === "boss" && enemy.state.includes("windup")) {
+                    ctx.fillStyle = "#ff3300";
+                    ctx.font = "bold 14px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(enemy.state === "spread_windup" ? "💥 탄막 폭격 준비!" : "⚡ 광역 내려찍기!", enemy.x, enemy.y - enemy.radius - 15);
+                }
+
+                let hpWidth = enemy.type === "boss" ? 60 : 30;
+                ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(enemy.x - hpWidth/2, enemy.y - enemy.radius - 6, hpWidth, 3);
+                ctx.fillStyle = "#ff3366"; ctx.fillRect(enemy.x - hpWidth/2, enemy.y - enemy.radius - 6, Math.max(0, (enemy.hp / enemy.maxHp) * hpWidth), 3);
             });
 
             projectiles.forEach(p => {
                 ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fillStyle = p.type === "boss_proj" ? "#ff4400" : "#ff00cc";
-                ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = p.type === "boss_proj" ? "#ff4400" : "#00ffff";
+                ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.stroke();
             });
 
-            if (player.invincibleTimer > 0) ctx.globalAlpha = 0.4 + Math.abs(Math.sin(Date.now() / 80)) * 0.6;
-            
             ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-            ctx.fillStyle = player.isParrying ? "#00ffff" : (player.invincibleTimer > 0 ? "#ffffff" : "#3388ff");
+            ctx.fillStyle = player.isParrying ? "#00ffff" : "#3388ff";
             ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
-            ctx.globalAlpha = 1.0; 
 
             if (player.isParrying) {
-                ctx.beginPath(); ctx.arc(player.x, player.y, player.radius + 18, 0, Math.PI * 2); 
-                ctx.strokeStyle = "rgba(0, 255, 255, 0.8)"; ctx.lineWidth = 4; ctx.stroke();
+                ctx.beginPath(); ctx.arc(player.x, player.y, player.radius + 15, 0, Math.PI * 2); 
+                ctx.strokeStyle = "rgba(0, 255, 255, 0.8)"; ctx.lineWidth = 3; ctx.stroke();
             }
 
             particles.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill(); });
 
             damageTexts.forEach(dt => {
                 ctx.fillStyle = dt.color;
-                ctx.font = dt.text.includes("STAGE") || dt.text.includes("BOSS") ? "bold 24px sans-serif" : "bold 15px sans-serif";
-                ctx.textAlign = "center"; ctx.globalAlpha = Math.min(1, dt.life / 20);
+                ctx.font = "bold 14px sans-serif";
+                ctx.textAlign = "center";
                 ctx.fillText(dt.text, dt.x, dt.y);
-                ctx.globalAlpha = 1; ctx.textAlign = "left";
             });
 
             ctx.restore();
 
+            // UI 표시
             ctx.fillStyle = "rgba(255, 255, 255, 0.1)"; ctx.fillRect(20, 20, 200, 16);
             ctx.fillStyle = "#00ff88"; ctx.fillRect(20, 20, (Math.max(0, player.hp) / player.maxHp) * 200, 16);
             ctx.strokeStyle = "#fff"; ctx.strokeRect(20, 20, 200, 16);
 
             ctx.fillStyle = "#ffffff"; ctx.font = "bold 13px sans-serif";
+            ctx.textAlign = "left";
             ctx.fillText(`HP: ${Math.max(0, Math.floor(player.hp))} / ${player.maxHp}`, 25, 33);
             ctx.fillText(`SCORE: ${score} | STAGE: ${stage}`, 20, 55);
-            ctx.fillText(`KILLS: ${stageKills} / ${nextBossTarget}`, 20, 75);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.2)"; ctx.fillRect(140, 65, 80, 10);
-            ctx.fillStyle = "#a855f7"; ctx.fillRect(140, 65, Math.min(1, stageKills / nextBossTarget) * 80, 10);
+            ctx.fillText(`BOSS KILLS TARGET | STAGE KILLS: ${stageKills} / ${nextBossTarget}`, 20, 75);
             
             let shiftReady = fireCooldown <= 0;
             ctx.fillStyle = shiftReady ? "#ff4400" : "#888888";
             ctx.fillText(`SHIFT (불공격) : ${shiftReady ? "READY!" : (fireCooldown/60).toFixed(1) + "s"}`, 20, 95);
 
             if (comboTimer > 0 && parryCombo > 0) {
-                ctx.fillStyle = "#ffff00"; ctx.font = "bold 16px sans-serif";
-                ctx.fillText(`COMBO: ${parryCombo} 🔥 (다음 패링 시 스킬 발동!)`, 20, 120);
+                ctx.fillStyle = "#ffff00";
+                ctx.fillText(`COMBO: ${parryCombo} 🔥`, 20, 115);
             }
         }
 
