@@ -1,10 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Action Roguelite - Optimized", page_icon="⚔️", layout="centered")
+st.set_page_config(page_title="Action Roguelite - Final Fix", page_icon="⚔️", layout="centered")
 
-st.title("⚔️ 광역 패링 & 스킬 콤보 액션 (최적화판)")
-st.caption("WASD: 이동 | Spacebar: 패링 | Shift: 불공격 | 보물상자: 패시브 획득 & 장비 강화")
+st.title("⚔️ 광역 패링 & 스킬 콤보 액션 (최종 수정판)")
+st.caption("WASD: 이동 | Spacebar: 패링 | Shift: 불공격 | 보스 처치 시 다음 스테이지 이동")
 
 game_html = """
 <!DOCTYPE html>
@@ -227,7 +227,7 @@ game_html = """
         let isGameOver = false;
         let enemies = [], projectiles = [], particles = [], damageTexts = [], effectRings = [], chests = [];
         let screenShake = 0, screenFlash = { timer: 0, color: "" }, score = 0;
-        let stage = 1, stageKills = 0, nextBossTarget = 30, isBossAlive = false;
+        let stage = 1, stageKills = 0, nextBossTarget = 25, isBossAlive = false;
         let parryCombo = 0, comboTimer = 0, fireCooldown = 0, baseFireCooldown = 300; 
 
         function initGame() {
@@ -247,7 +247,7 @@ game_html = """
             damageTexts = []; effectRings = []; chests = [];
             screenShake = 0; screenFlash = { timer: 0, color: "" };
             score = 0; stage = 1; stageKills = 0;
-            nextBossTarget = 30; isBossAlive = false;
+            nextBossTarget = 25; isBossAlive = false;
             parryCombo = 0; comboTimer = 0;
             fireCooldown = 0; baseFireCooldown = 300;
             keys = {};
@@ -281,8 +281,8 @@ game_html = """
                         let isCrit = Math.random() < player.criticalRate;
                         let dmg = 80 * player.damageMult * (isCrit ? 1.5 : 1.0);
                         e.hp -= dmg;
-                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#00ffff", 40);
-                        createParticles(e.x, e.y, "#00ffff", 8); // 파티클 개수 최적화
+                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#00ffff", 35);
+                        createParticles(e.x, e.y, "#00ffff", 6);
                     });
                 }
             },
@@ -299,8 +299,8 @@ game_html = """
                             let dmg = 100 * player.damageMult * (isCrit ? 1.5 : 1.0);
                             e.hp -= dmg;
                             if (e.type !== "boss") { e.x += (dx/dist)*150; e.y += (dy/dist)*150; e.state = "stun"; e.stateTimer = 0; }
-                            addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#ff5500", 40);
-                            createParticles(e.x, e.y, "#ff5500", 10);
+                            addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#ff5500", 35);
+                            createParticles(e.x, e.y, "#ff5500", 8);
                         }
                     });
                 }
@@ -314,8 +314,8 @@ game_html = """
                         let dmg = 50 * player.damageMult * (isCrit ? 1.5 : 1.0);
                         e.hp -= dmg;
                         if (e.type !== "boss") e.freezeTimer = 60; else e.freezeTimer = 20;
-                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#88ffff", 40);
-                        createParticles(e.x, e.y, "#88ffff", 8);
+                        addDamageText(e.x, e.y - 20, (isCrit ? "CRIT! " : "") + Math.floor(dmg), isCrit ? "#ffff00" : "#88ffff", 35);
+                        createParticles(e.x, e.y, "#88ffff", 6);
                     });
                 }
             }
@@ -323,7 +323,7 @@ game_html = """
 
         function spawnEnemy() {
             if (isPaused || isGameOver) return;
-            let maxEnemies = 10 + (stage * 2); 
+            let maxEnemies = 8 + (stage * 2); 
             if (enemies.length >= maxEnemies || isBossAlive) return;
 
             let x = Math.random() < 0.5 ? (Math.random() < 0.5 ? -20 : canvas.width + 20) : Math.random() * canvas.width;
@@ -344,16 +344,16 @@ game_html = """
                 state: "chase", stateTimer: 0, freezeTimer: 0, burnTimer: 0
             });
         }
-        setInterval(spawnEnemy, 1400);
+        setInterval(spawnEnemy, 1600);
 
         function spawnBoss() {
             isBossAlive = true;
             addDamageText(canvas.width/2, canvas.height/2, "⚠️ WARNING: BOSS INCOMING ⚠️", "#ff0000", 100);
             screenShake = 30;
-            let hpMult = 1 + (stage - 1) * 0.8;
+            let hpMult = 1 + (stage - 1) * 0.7;
             enemies.push({
                 x: canvas.width / 2, y: -50, type: "boss", radius: 35,
-                hp: 1500 * hpMult, maxHp: 1500 * hpMult, speed: 1.6,
+                hp: 1200 * hpMult, maxHp: 1200 * hpMult, speed: 1.5,
                 state: "enter", stateTimer: 0, freezeTimer: 0, burnTimer: 0, patternIndex: 0
             });
         }
@@ -367,55 +367,75 @@ game_html = """
         function triggerFireAttack() {
             fireCooldown = baseFireCooldown; screenShake = 18;
             effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 280, life: 25, maxLife: 25, color: "255, 68, 0" });
-            createParticles(player.x, player.y, "#ff4400", 25);
+            createParticles(player.x, player.y, "#ff4400", 20);
             
             let dmg = 50 * player.damageMult;
             enemies.forEach(e => {
                 if (Math.hypot(e.x - player.x, e.y - player.y) < 280) {
                     e.hp -= dmg; e.burnTimer = 240;
-                    addDamageText(e.x, e.y - 20, "FIRE!", "#ffaa00", 30);
+                    addDamageText(e.x, e.y - 20, "FIRE!", "#ffaa00", 25);
                 }
             });
-            addDamageText(player.x, player.y - 45, "🔥파이어 스톰!🔥", "#ff4400", 50);
+            addDamageText(player.x, player.y - 45, "🔥파이어 스톰!🔥", "#ff4400", 45);
         }
 
         function executeParry(sourceX, sourceY, isBoss) {
             player.isParrying = false; player.parryTimer = 0; player.invincibleTimer = 45; 
-            screenShake = 20;
-            createParticles(player.x, player.y, "#00ffff", 20); // 과도한 파티클 제한
-            addDamageText(player.x, player.y - 25, "PERFECT PARRY!", "#00ffff", 40);
+            screenShake = isBoss ? 25 : 15;
+            createParticles(player.x, player.y, "#00ffff", 15);
+            addDamageText(player.x, player.y - 25, "PERFECT PARRY!", "#00ffff", 35);
             effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 180, life: 20, maxLife: 20, color: "0, 255, 255" });
 
             let parryRadius = 180;
-            let pDmg = (isBoss ? 180 : 70) * player.damageMult;
+            let pDmg = (isBoss ? 160 : 70) * player.damageMult;
             score += isBoss ? 1000 : 200;
 
-            // 적 다중 타격 시 과부하를 막기 위해 텍스트 출력을 요약하고 파티클을 간소화
             let hitCount = 0;
             enemies.forEach(e => {
-                if (Math.hypot(e.x - player.x, e.y - player.y) < parryRadius) {
+                let dist = Math.hypot(e.x - player.x, e.y - player.y);
+                if (dist < parryRadius) {
                     e.hp -= pDmg;
                     hitCount++;
-                    if (hitCount <= 5) { // 너무 많은 텍스트가 동시에 뜨지 않도록 제한
-                        addDamageText(e.x, e.y - 15, "PARRIED!", "#00ffff", 30);
+                    if (hitCount <= 4) {
+                        addDamageText(e.x, e.y - 15, "PARRIED!", "#00ffff", 25);
                     }
                     if (e.type !== "boss") {
                         e.state = "stun"; e.stateTimer = 0;
                         let pushAngle = Math.atan2(e.y - player.y, e.x - player.x);
-                        e.x += Math.cos(pushAngle) * 40; e.y += Math.sin(pushAngle) * 40;
+                        e.x += Math.cos(pushAngle) * 35; e.y += Math.sin(pushAngle) * 35;
                     }
                 }
             });
 
+            // 투사체 정리 시 렉 유발 방지를 위해 개수 제한
+            let removedProj = 0;
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 if (Math.hypot(p.x - player.x, p.y - player.y) < parryRadius) {
                     projectiles.splice(i, 1);
+                    removedProj++;
+                    if (removedProj > 15) break; // 한 번에 너무 많은 투사체 삭제 연산 방지
                 }
             }
 
             let pushAngle = Math.atan2(player.y - sourceY, player.x - sourceX);
-            player.vx = Math.cos(pushAngle) * 15; player.vy = Math.sin(pushAngle) * 15;
+            player.vx = Math.cos(pushAngle) * 12; player.vy = Math.sin(pushAngle) * 12;
+
+            // 🦇 패링 성공 시 8% 확률로 뱀파이어 흡혈 특수 공격 발동
+            if (Math.random() < 0.08) {
+                player.hp = Math.min(player.maxHp, player.hp + 45);
+                screenFlash = { timer: 20, color: "rgba(255, 0, 85, 0.4)" };
+                effectRings.push({ x: player.x, y: player.y, radius: player.radius, maxRadius: 320, life: 25, maxLife: 25, color: "255, 0, 85" });
+                enemies.forEach(e => {
+                    let d = Math.hypot(e.x - player.x, e.y - player.y);
+                    if (d < 320) {
+                        let vDmg = 130 * player.damageMult;
+                        e.hp -= vDmg;
+                        addDamageText(e.x, e.y - 20, "VAMPIRE! -" + Math.floor(vDmg), "#ff0055", 35);
+                    }
+                });
+                addDamageText(player.x, player.y - 50, "🦇 뱀파이어 블러드 흡혈 특수기! (+45 HP) 🦇", "#ff0055", 70);
+            }
 
             onParrySuccess();
         }
@@ -425,24 +445,22 @@ game_html = """
             if (parryCombo >= 2) {
                 let randomSkill = SKILL_POOL[Math.floor(Math.random() * SKILL_POOL.length)];
                 randomSkill.action();
-                addDamageText(player.x, player.y - 45, "⭐" + randomSkill.name + " 연계기!⭐", "#ffff00", 60);
+                addDamageText(player.x, player.y - 45, "⭐" + randomSkill.name + " 연계기!⭐", "#ffff00", 50);
                 parryCombo = 0; 
             }
         }
 
-        function addDamageText(x, y, text, color, life=35) {
-            // 지나친 텍스트 객체 누적으로 인한 렉 방지 (최대 30개까지만 유지)
-            if (damageTexts.length > 30) damageTexts.shift();
+        function addDamageText(x, y, text, color, life=30) {
+            if (damageTexts.length > 25) damageTexts.shift();
             damageTexts.push({ x, y, text: String(text), color, life: life, opacity: 1 });
         }
 
-        function createParticles(x, y, color, count = 10) {
-            // 과도한 파티클 생성 제한
-            if (particles.length > 150) return;
+        function createParticles(x, y, color, count = 8) {
+            if (particles.length > 100) return;
             for (let i = 0; i < count; i++) {
                 particles.push({
-                    x, y, vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12,
-                    size: Math.random() * 4 + 2, color: color, life: 15 + Math.random() * 10
+                    x, y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
+                    size: Math.random() * 3 + 2, color: color, life: 12 + Math.random() * 8
                 });
             }
         }
@@ -502,7 +520,7 @@ game_html = """
                     enemy.burnTimer--;
                     if (enemy.burnTimer % 30 === 0) {
                         let bDmg = 15 * player.damageMult; enemy.hp -= bDmg;
-                        addDamageText(enemy.x, enemy.y - 10, "-" + Math.floor(bDmg), "#ff4400", 25);
+                        addDamageText(enemy.x, enemy.y - 10, "-" + Math.floor(bDmg), "#ff4400", 20);
                     }
                 }
                 if (enemy.freezeTimer > 0) { enemy.freezeTimer--; return; }
@@ -558,9 +576,9 @@ game_html = """
                         }
                     } else if (enemy.state === "spread_windup") {
                         if (enemy.stateTimer > 40) {
-                            for(let i=0; i<12; i++) {
-                                let angle = (Math.PI * 2 / 12) * i;
-                                projectiles.push({ x: enemy.x, y: enemy.y, type: "boss_proj", vx: Math.cos(angle) * 5.5, vy: Math.sin(angle) * 5.5, radius: 9 });
+                            for(let i=0; i<10; i++) {
+                                let angle = (Math.PI * 2 / 10) * i;
+                                projectiles.push({ x: enemy.x, y: enemy.y, type: "boss_proj", vx: Math.cos(angle) * 5, vy: Math.sin(angle) * 5, radius: 8 });
                             }
                             enemy.state = "chase"; enemy.stateTimer = 0;
                         }
@@ -575,14 +593,14 @@ game_html = """
                                     addDamageText(player.x, player.y - 20, "-35 HP", "#ff0000");
                                 }
                             }
-                            createParticles(enemy.x, enemy.y, "#ff0055", 20);
+                            createParticles(enemy.x, enemy.y, "#ff0055", 15);
                             effectRings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, maxRadius: 160, life: 15, maxLife: 15, color: "255, 0, 85" });
                             enemy.state = "chase"; enemy.stateTimer = 0;
                         }
                     } else if (enemy.state === "dash_windup") {
                         if (enemy.stateTimer > 30) {
-                            enemy.vx = (dx / dist) * 12;
-                            enemy.vy = (dy / dist) * 12;
+                            enemy.vx = (dx / dist) * 11;
+                            enemy.vy = (dy / dist) * 11;
                             enemy.state = "dash_attack";
                             enemy.stateTimer = 0;
                         }
@@ -623,30 +641,35 @@ game_html = """
             let bossDiedThisFrame = false; let bossDeathPos = {x:0, y:0};
             enemies = enemies.filter(e => {
                 if (e.hp <= 0) {
-                    createParticles(e.x, e.y, "#ff3366", 15); 
+                    createParticles(e.x, e.y, "#ff3366", 12); 
                     score += (e.type === "boss" ? 2000 : (e.type === "tank" ? 250 : 120));
                     if (player.vampireRate > 0) {
                         player.hp = Math.min(player.maxHp, player.hp + player.vampireRate);
                     }
-                    if (e.type === "boss") { bossDiedThisFrame = true; bossDeathPos = {x: e.x, y: e.y}; isBossAlive = false; } 
-                    else { stageKills++; }
+                    if (e.type === "boss") { 
+                        bossDiedThisFrame = true; 
+                        bossDeathPos = {x: e.x, y: e.y}; 
+                        isBossAlive = false; 
+                    } else { 
+                        stageKills++; 
+                    }
                     return false;
                 }
                 return true;
             });
 
+            // 보스 처치 시 스테이지 클리어 및 다음 스테이지 진입
             if (bossDiedThisFrame) {
+                stage++;
                 chests.push({ x: bossDeathPos.x, y: bossDeathPos.y, radius: 20 });
                 addDamageText(bossDeathPos.x, bossDeathPos.y - 30, "보물상자 등장!", "#ffff00");
+                addDamageText(canvas.width/2, canvas.height/2, `STAGE ${stage} START!`, "#00ff88", 90);
+                player.hp = Math.min(player.maxHp, player.hp + 40);
+                stageKills = 0;
+                nextBossTarget += 15; // 다음 보스 소환 요구 킬 수 증가
             }
 
-            if (!isBossAlive && stageKills >= nextBossTarget) { nextBossTarget += 30; spawnBoss(); }
-
-            if (stageKills >= 100) {
-                stage++; stageKills = 0; nextBossTarget = 30;
-                addDamageText(canvas.width/2, canvas.height/2, `STAGE ${stage} START!`, "#00ff88", 80);
-                player.hp = Math.min(player.maxHp, player.hp + 30);
-            }
+            if (!isBossAlive && stageKills >= nextBossTarget) { spawnBoss(); }
 
             if (screenShake > 0) screenShake *= 0.85;
 
@@ -738,9 +761,9 @@ game_html = """
             ctx.fillStyle = "#ffffff"; ctx.font = "bold 13px sans-serif";
             ctx.fillText(`HP: ${Math.max(0, Math.floor(player.hp))} / ${player.maxHp}`, 25, 33);
             ctx.fillText(`SCORE: ${score} | STAGE: ${stage}`, 20, 55);
-            ctx.fillText(`KILLS: ${stageKills} / 100`, 20, 75);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.2)"; ctx.fillRect(130, 65, 90, 10);
-            ctx.fillStyle = "#a855f7"; ctx.fillRect(130, 65, (stageKills / 100) * 90, 10);
+            ctx.fillText(`KILLS: ${stageKills} / ${nextBossTarget}`, 20, 75);
+            ctx.fillStyle = "rgba(255, 255, 255, 0.2)"; ctx.fillRect(140, 65, 80, 10);
+            ctx.fillStyle = "#a855f7"; ctx.fillRect(140, 65, Math.min(1, stageKills / nextBossTarget) * 80, 10);
             
             let shiftReady = fireCooldown <= 0;
             ctx.fillStyle = shiftReady ? "#ff4400" : "#888888";
