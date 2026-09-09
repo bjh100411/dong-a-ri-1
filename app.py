@@ -1,371 +1,231 @@
 import streamlit as st
+import time
 import random
 
-# --- 페이지 기본 설정 ---
+# ---------------------------------------------------------
+# 1. 페이지 설정 및 커스텀 CSS
+# ---------------------------------------------------------
 st.set_page_config(
-    page_title="BREACH PROTOCOL // CYBERPUNK 2077",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    page_title="QTE 커맨드 히어로!",
+    page_icon="⚔️",
+    layout="centered"
 )
 
-# --- Cyberpunk 2077 원작 HUD 완벽 재현 CSS ---
-CYBERPUNK_CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700;800&family=Share+Tech+Mono&display=swap');
-
-/* 전체 배경 및 기본 폰트 */
-.stApp {
-    background-color: #05070B !important;
-    color: #D1D5DB;
-    font-family: 'Chakra Petch', sans-serif;
-}
-
-/* 상단 사이버펑크 시그니처 옐로우 배너 */
-.cp-header-banner {
-    background-color: #FCEE09;
-    color: #000000;
-    padding: 10px 24px;
-    font-family: 'Chakra Petch', sans-serif;
-    font-weight: 800;
-    font-size: 26px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
-    margin-bottom: 25px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 0 15px rgba(252, 238, 9, 0.4);
-}
-
-.cp-header-sub {
-    font-size: 14px;
-    font-family: 'Share Tech Mono', monospace;
-    background: #000;
-    color: #FCEE09;
-    padding: 2px 8px;
-}
-
-/* 섹션 타이틀 */
-.cp-title {
-    color: #FF003C;
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    border-bottom: 2px solid #FF003C;
-    padding-bottom: 4px;
-    margin-bottom: 12px;
-}
-
-/* 활성화된 방향 트레이스 안내 바 */
-.trace-indicator {
-    background-color: rgba(0, 240, 255, 0.1);
-    border: 1px solid #00F0FF;
-    color: #00F0FF;
-    font-family: 'Share Tech Mono', monospace;
-    padding: 8px 12px;
-    font-size: 14px;
-    margin-bottom: 15px;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
-}
-
-/* 버퍼 (Buffer) 박스 스타일 */
-.buffer-container {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 25px;
-}
-
-.buffer-slot {
-    width: 50px;
-    height: 50px;
-    border: 2px solid #FCEE09;
-    background-color: rgba(252, 238, 9, 0.08);
-    color: #FCEE09;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 22px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: inset 0 0 8px rgba(252, 238, 9, 0.3);
-}
-
-.buffer-slot.empty {
-    border: 1px dashed #202B38;
-    background-color: rgba(15, 23, 42, 0.3);
-    color: transparent;
-}
-
-/* 시퀀스 목표 카드 */
-.seq-card {
-    background-color: #0A0D14;
-    border: 1px solid #1A2332;
-    border-left: 4px solid #FF003C;
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
-}
-
-.seq-card.success {
-    border-left: 4px solid #00F0FF;
-    background-color: rgba(0, 240, 255, 0.06);
-}
-
-.seq-name {
-    font-weight: 700;
-    font-size: 13px;
-    color: #FF003C;
-    letter-spacing: 1px;
-    margin-bottom: 4px;
-}
-
-.seq-card.success .seq-name {
-    color: #00F0FF;
-}
-
-.seq-codes {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 20px;
-    color: #FFFFFF;
-    letter-spacing: 3px;
-}
-
-/* 매트릭스 버튼 (Streamlit 커스텀 버튼 디자인) */
-div[data-testid="column"] button {
-    background-color: rgba(0, 240, 255, 0.04) !important;
-    border: 2px solid #00F0FF !important;
-    color: #00F0FF !important;
-    font-family: 'Share Tech Mono', monospace !important;
-    font-size: 22px !important;
-    font-weight: bold !important;
-    height: 64px !important;
-    width: 100% !important;
-    border-radius: 0px !important;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%) !important;
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.15) !important;
-    transition: all 0.15s ease-in-out !important;
-}
-
-/* 마우스 호버 시 사이버펑크 옐로우 효과 */
-div[data-testid="column"] button:hover:not(:disabled) {
-    background-color: #FCEE09 !important;
-    color: #000000 !important;
-    border-color: #FCEE09 !important;
-    box-shadow: 0 0 20px #FCEE09 !important;
-    transform: scale(1.03);
-    cursor: pointer;
-}
-
-/* 선택 불가능한 버튼 (어둡게 비활성화) */
-div[data-testid="column"] button:disabled {
-    background-color: #06080D !important;
-    border: 1px solid #121824 !important;
-    color: #253243 !important;
-    opacity: 0.4 !important;
-    box-shadow: none !important;
-}
-
-/* 게임 종료 / 상태 메시지 박스 */
-.status-box-success {
-    background-color: rgba(0, 240, 255, 0.1);
-    border: 2px solid #00F0FF;
-    color: #00F0FF;
-    padding: 15px;
-    font-size: 18px;
-    font-weight: bold;
-    text-align: center;
-    margin-top: 15px;
-}
-
-.status-box-fail {
-    background-color: rgba(255, 0, 60, 0.1);
-    border: 2px solid #FF003C;
-    color: #FF003C;
-    padding: 15px;
-    font-size: 18px;
-    font-weight: bold;
-    text-align: center;
-    margin-top: 15px;
-}
-</style>
-"""
-
-st.markdown(CYBERPUNK_CSS, unsafe_allow_html=True)
-
-# --- 퍼즐 생성 및 게임 로직 함수 ---
-HEX_CODES = ['1C', '55', 'BD', 'E9', '7A', 'FF']
-MATRIX_SIZE = 5
-BUFFER_SIZE = 6
-
-def generate_solvable_puzzle():
-    """풀이가 반드시 존재하는 5x5 행렬 및 목표 시퀀스 생성"""
-    matrix = [[random.choice(HEX_CODES) for _ in range(MATRIX_SIZE)] for _ in range(MATRIX_SIZE)]
-    
-    # 정답 경로 생성 (가로 -> 세로 -> 가로...)
-    path = []
-    r, c = 0, random.randint(0, MATRIX_SIZE - 1)
-    path.append(matrix[r][c])
-    visited = {(r, c)}
-    is_row = False 
-
-    for _ in range(5):
-        if not is_row: # 세로 이동 (col c 안에서)
-            valid_rows = [nr for nr in range(MATRIX_SIZE) if (nr, c) not in visited]
-            if not valid_rows: break
-            r = random.choice(valid_rows)
-        else: # 가로 이동 (row r 안에서)
-            valid_cols = [nc for nc in range(MATRIX_SIZE) if (r, nc) not in visited]
-            if not valid_cols: break
-            c = random.choice(valid_cols)
-
-        visited.add((r, c))
-        path.append(matrix[r][c])
-        is_row = not is_row
-
-    # 목표 시퀀스 분할 지정
-    if len(path) >= 5:
-        seq1 = path[0:2]
-        seq2 = path[1:4]
-        seq3 = path[2:5]
-    else:
-        seq1 = [random.choice(HEX_CODES) for _ in range(2)]
-        seq2 = [random.choice(HEX_CODES) for _ in range(3)]
-        seq3 = [random.choice(HEX_CODES) for _ in range(3)]
-
-    targets = {
-        "DATAMINE_V1": {"seq": seq1, "reward": "100 Eurodollars"},
-        "DATAMINE_V2": {"seq": seq2, "reward": "Quickhack Components"},
-        "DATAMINE_V3": {"seq": seq3, "reward": "Daemon Executed"}
-    }
-    return matrix, targets
-
-def is_subsequence(target, buffer):
-    """버퍼 내에 연속된 시퀀스가 존재하는지 확인"""
-    t_len, b_len = len(target), len(buffer)
-    if t_len > b_len: return False
-    for i in range(b_len - t_len + 1):
-        if buffer[i:i+t_len] == target:
-            return True
-    return False
-
-# --- 세션 스테이트 초기화 ---
-if 'initialized' not in st.session_state:
-    matrix, targets = generate_solvable_puzzle()
-    st.session_state.initialized = True
-    st.session_state.matrix = matrix
-    st.session_state.targets = targets
-    st.session_state.buffer = []
-    st.session_state.clicked = set()
-    st.session_state.is_row = True  # True: 가로(행) 선택 차례, False: 세로(열) 선택 차례
-    st.session_state.current_idx = 0 # 현재 활성화된 가로/세로 번호
-    st.session_state.success = []
-    st.session_state.game_over = False
-
-def handle_click(r, c, code):
-    if st.session_state.game_over: return
-    
-    st.session_state.buffer.append(code)
-    st.session_state.clicked.add((r, c))
-    
-    # 시퀀스 달성 검사
-    for name, data in st.session_state.targets.items():
-        if name not in st.session_state.success:
-            if is_subsequence(data["seq"], st.session_state.buffer):
-                st.session_state.success.append(name)
-                
-    # 방향 전환 (가로 <-> 세로)
-    st.session_state.is_row = not st.session_state.is_row
-    st.session_state.current_idx = c if not st.session_state.is_row else r
-    
-    # 게임 종료 조건 (버퍼 가득 참 또는 모든 시퀀스 달성)
-    if len(st.session_state.buffer) >= BUFFER_SIZE or len(st.session_state.success) == len(st.session_state.targets):
-        st.session_state.game_over = True
-
-def reset_game():
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-
-# --- UI 레이아웃 렌더링 ---
-
-# 1. 상단 사이버펑크 옐로우 헤더 배너
 st.markdown("""
-<div class="cp-header-banner">
-    <div>BREACH PROTOCOL // 침투 프로토콜</div>
-    <div class="cp-header-sub">ACCESS LEVEL: SECURE</div>
-</div>
+<style>
+    .stApp {
+        background-color: #0e1117;
+    }
+    .qte-container {
+        background: linear-gradient(135deg, #1f2937, #111827);
+        border: 3px solid #ff4b4b;
+        border-radius: 15px;
+        padding: 25px;
+        text-align: center;
+        box-shadow: 0 0 20px rgba(255, 75, 75, 0.3);
+        margin-bottom: 20px;
+    }
+    .qte-command {
+        font-size: 45px;
+        font-weight: 900;
+        color: #00f2fe;
+        letter-spacing: 5px;
+        text-shadow: 0 0 12px rgba(0, 242, 254, 0.8);
+        margin: 15px 0;
+    }
+    .hud-card {
+        background-color: #1f2937;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid #374151;
+    }
+    .hud-title {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-bottom: 2px;
+    }
+    .hud-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #ffffff;
+    }
+</style>
 """, unsafe_allow_html=True)
 
-col_matrix, col_info = st.columns([1.3, 1], gap="large")
+# ---------------------------------------------------------
+# 2. 커맨드 풀 및 게임 데이터
+# ---------------------------------------------------------
+COMMAND_POOL = [
+    "ATTACK", "DEFEND", "PARRY", "DODGE", "SLASH", 
+    "SMASH", "HEAL", "FIREBALL", "CRITICAL", "COUNTER",
+    "SHIELD", "BURST", "STRIKE", "CHARGE", "ULTIMATE"
+]
 
-# 2. 좌측: 코드 행렬 (CODE MATRIX)
-with col_matrix:
-    st.markdown('<div class="cp-title">CODE MATRIX</div>', unsafe_allow_html=True)
-    
-    # 현재 선택해야 하는 방향 표시 (가로/세로)
-    if not st.session_state.game_over:
-        direction_str = f"ROW {st.session_state.current_idx + 1}" if st.session_state.is_row else f"COLUMN {st.session_state.current_idx + 1}"
-        st.markdown(f'<div class="trace-indicator">► ACTIVE TRACE: <b>{direction_str}</b></div>', unsafe_allow_html=True)
+# ---------------------------------------------------------
+# 3. 세션 상태(Session State) 초기화
+# ---------------------------------------------------------
+if "game_status" not in st.session_state:
+    st.session_state.game_status = "INIT"  # INIT, PLAYING, GAME_OVER
+    st.session_state.score = 0
+    st.session_state.combo = 0
+    st.session_state.max_combo = 0
+    st.session_state.hp = 3
+    st.session_state.round = 0
+    st.session_state.current_cmd = ""
+    st.session_state.start_time = 0.0
+    st.session_state.time_limit = 3.0
+    st.session_state.last_msg = ""
+    st.session_state.last_status = "info"
+
+# ---------------------------------------------------------
+# 4. 게임 로직 함수
+# ---------------------------------------------------------
+def start_game():
+    st.session_state.game_status = "PLAYING"
+    st.session_state.score = 0
+    st.session_state.combo = 0
+    st.session_state.max_combo = 0
+    st.session_state.hp = 3
+    st.session_state.round = 1
+    st.session_state.time_limit = 3.0
+    st.session_state.current_cmd = random.choice(COMMAND_POOL)
+    st.session_state.start_time = time.time()
+    st.session_state.last_msg = "⚔️ 전투 시작! 커맨드를 빠르게 입력하세요!"
+    st.session_state.last_status = "info"
+
+def process_turn(user_input):
+    elapsed = time.time() - st.session_state.start_time
+    target = st.session_state.current_cmd
+    limit = st.session_state.time_limit
+    user_cmd = user_input.strip().upper()
+
+    if elapsed > limit:
+        # 시간 초과 실패
+        st.session_state.hp -= 1
+        st.session_state.combo = 0
+        st.session_state.last_msg = f"⏰ 시간 초과! ({elapsed:.2f}초 걸림 / 제한: {limit:.1f}초)"
+        st.session_state.last_status = "error"
+    elif user_cmd == target:
+        # 입력 성공
+        st.session_state.combo += 1
+        if st.session_state.combo > st.session_state.max_combo:
+            st.session_state.max_combo = st.session_state.combo
+        
+        # 반응속도 보너스 점수 계산
+        speed_ratio = max(0.0, (limit - elapsed) / limit)
+        speed_bonus = int(speed_ratio * 150)
+        combo_bonus = st.session_state.combo * 30
+        gained_score = 100 + combo_bonus + speed_bonus
+        
+        st.session_state.score += gained_score
+        st.session_state.last_msg = f"⚡ 성공! +{gained_score}점 (반응속도: {elapsed:.2f}초)"
+        st.session_state.last_status = "success"
     else:
-        st.markdown('<div class="trace-indicator" style="border-color:#FF003C; color:#FF003C;">► CONNECTION CLOSED</div>', unsafe_allow_html=True)
+        # 오타 실패
+        st.session_state.hp -= 1
+        st.session_state.combo = 0
+        st.session_state.last_msg = f"❌ 커맨드 입력 실수! (입력: '{user_cmd}' / 정답: '{target}')"
+        st.session_state.last_status = "warning"
 
-    # 5x5 그리드 버튼 생성
-    for r in range(MATRIX_SIZE):
-        cols = st.columns(MATRIX_SIZE)
-        for c in range(MATRIX_SIZE):
-            with cols[c]:
-                code = st.session_state.matrix[r][c]
-                is_clicked = (r, c) in st.session_state.clicked
-                
-                # 버튼 활성화 여부 계산
-                is_active_line = (r == st.session_state.current_idx) if st.session_state.is_row else (c == st.session_state.current_idx)
-                is_disabled = is_clicked or (not is_active_line) or st.session_state.game_over
-                
-                display_label = "[  ]" if is_clicked else code
-                
-                st.button(
-                    display_label,
-                    key=f"btn_{r}_{c}",
-                    disabled=is_disabled,
-                    on_click=handle_click,
-                    args=(r, c, code)
-                )
+    # 게임 오버 여부 판정
+    if st.session_state.hp <= 0:
+        st.session_state.game_status = "GAME_OVER"
+    else:
+        # 다음 라운드 진행 및 난이도 상승
+        st.session_state.round += 1
+        # 1000점마다 제한시간 0.25초 감소 (최소 1.0초까지 제한)
+        st.session_state.time_limit = max(1.0, 3.0 - (st.session_state.score // 1000) * 0.25)
+        st.session_state.current_cmd = random.choice(COMMAND_POOL)
+        st.session_state.start_time = time.time()
 
-# 3. 우측: 버퍼 & 시퀀스 (BUFFER & TARGET SEQUENCES)
-with col_info:
-    # 버퍼 영역
-    st.markdown('<div class="cp-title">BUFFER</div>', unsafe_allow_html=True)
-    buffer_html = '<div class="buffer-container">'
-    for i in range(BUFFER_SIZE):
-        if i < len(st.session_state.buffer):
-            buffer_html += f'<div class="buffer-slot">{st.session_state.buffer[i]}</div>'
+# ---------------------------------------------------------
+# 5. 화면 렌더링 (UI)
+# ---------------------------------------------------------
+st.title("⚔️ QTE 커맨드 히어로!")
+st.caption("화면에 나타나는 커맨드를 누구보다 빠르게 typing 하세요!")
+
+# [화면 1] 대기 화면 (INIT)
+if st.session_state.game_status == "INIT":
+    st.markdown("""
+    ### 🎮 게임 규칙
+    1. 화면 중앙에 나타나는 **영어 커맨드**를 입력창에 똑같이 입력합니다.
+    2. 입력 후 **Enter 키**를 누르면 즉시 공격이 실행됩니다.
+    3. 빠른 반응 속도와 **연속 콤보**로 더 높은 점수를 획득하세요!
+    4. 제한시간을 넘기거나 오타가 나면 **체력(HP)**이 줄어듭니다.
+    """)
+    st.divider()
+    if st.button("🚀 게임 시작하기", use_container_width=True, type="primary"):
+        start_game()
+        st.rerun()
+
+# [화면 2] 게임 진행 화면 (PLAYING)
+elif st.session_state.game_status == "PLAYING":
+    # 상단 HUD (상태 표시창)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        hp_hearts = "❤️" * st.session_state.hp + "🖤" * (3 - st.session_state.hp)
+        st.markdown(f"<div class='hud-card'><div class='hud-title'>체력</div><div class='hud-value'>{hp_hearts}</div></div>", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"<div class='hud-card'><div class='hud-title'>현재 점수</div><div class='hud-value'>{st.session_state.score}</div></div>", unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"<div class='hud-card'><div class='hud-title'>콤보</div><div class='hud-value'>🔥 {st.session_state.combo}</div></div>", unsafe_allow_html=True)
+    with col4:
+        st.markdown(f"<div class='hud-card'><div class='hud-title'>제한시간</div><div class='hud-value'>⏳ {st.session_state.time_limit:.1f}초</div></div>", unsafe_allow_html=True)
+
+    st.write("")
+
+    # 이전 결과 알림 메시지
+    if st.session_state.last_msg:
+        if st.session_state.last_status == "success":
+            st.success(st.session_state.last_msg)
+        elif st.session_state.last_status in ["error", "warning"]:
+            st.error(st.session_state.last_msg)
         else:
-            buffer_html += '<div class="buffer-slot empty">--</div>'
-    buffer_html += '</div>'
-    st.markdown(buffer_html, unsafe_allow_html=True)
+            st.info(st.session_state.last_msg)
 
-    # 목표 시퀀스 영역
-    st.markdown('<div class="cp-title">SEQUENCE REQUIRED TO UPLOAD</div>', unsafe_allow_html=True)
-    for name, data in st.session_state.targets.items():
-        is_done = name in st.session_state.success
-        card_class = "seq-card success" if is_done else "seq-card"
-        status_text = "[ UPLOAD COMPLETE ]" if is_done else f"REWARD: {data['reward']}"
-        seq_str = " ".join(data['seq'])
-        
-        st.markdown(f"""
-        <div class="{card_class}">
-            <div class="seq-name">{name} // {status_text}</div>
-            <div class="seq-code">{seq_str}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # QTE 메인 커맨드 박스
+    st.markdown(f"""
+    <div class='qte-container'>
+        <div style='color: #9ca3af; font-size: 14px;'>ROUND {st.session_state.round}</div>
+        <div class='qte-command'>{st.session_state.current_cmd}</div>
+        <div style='color: #ffcc00; font-size: 12px;'>▲ 대소문자 상관없이 빠르게 입력하세요! ▲</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # 게임 상태 및 리셋 버튼
-    if st.session_state.game_over:
-        if len(st.session_state.success) > 0:
-            st.markdown('<div class="status-box-success">✔ DATAMINE COMPLETE: DAEMON INSTALLED</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="status-box-fail">✖ INTRUSION FAILED: SYSTEM LOCKED OUT</div>', unsafe_allow_html=True)
+    # 입력 폼 (clear_on_submit으로 제출 시 자동으로 입력창 비움)
+    with st.form(key=f"qte_form_{st.session_state.round}", clear_on_submit=True):
+        user_input = st.text_input("커맨드 입력 후 Enter:", key=f"input_{st.session_state.round}", label_visibility="collapsed")
+        submit_btn = st.form_submit_button("⚡ 커맨드 실행 (Enter)", use_container_width=True, type="primary")
         
-        st.write("")
-        st.button("REBOOT SYSTEM (재시작)", on_click=reset_game, use_container_width=True)
+        if submit_btn:
+            process_turn(user_input)
+            st.rerun()
+
+# [화면 3] 게임 오버 화면 (GAME_OVER)
+elif st.session_state.game_status == "GAME_OVER":
+    st.error("💥 GAME OVER - 용사가 쓰러졌습니다!")
+    
+    # 등급 평가
+    score = st.session_state.score
+    if score >= 3000:
+        rank = "🏆 S급 (신급 반응속도!)"
+    elif score >= 1800:
+        rank = "🥇 A급 (빛의 검사)"
+    elif score >= 1000:
+        rank = "🥈 B급 (숙련된 모험가)"
+    else:
+        rank = "🥉 C급 (초보 수련생)"
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("최종 점수", f"{st.session_state.score} 점")
+        st.metric("최대 콤보", f"{st.session_state.max_combo} Combo")
+    with col2:
+        st.metric("도달 라운드", f"{st.session_state.round} Round")
+        st.metric("최종 랭크", rank)
+
+    st.divider()
+    if st.button("🔄 다시 도전하기", use_container_width=True, type="primary"):
+        start_game()
+        st.rerun()
