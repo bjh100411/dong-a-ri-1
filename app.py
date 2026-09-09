@@ -4,101 +4,173 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="나만의 리듬게임", layout="centered")
 
 st.title("🎹 웹 기반 건반 리듬게임")
-st.write("노래에 맞춰 D, F, J, K 키를 눌러보세요!")
+st.write("시작하려면 화면을 한 번 클릭한 뒤 **스페이스바**를 누르세요. (D, F, J, K 키 사용)")
 
-# 난이도 선택 (스트림릿 UI)
+# 난이도 선택
 difficulty = st.selectbox("난이도를 선택하세요", ["Easy", "Hard"])
-
-# 선택된 난이도에 따라 HTML/JS로 전달할 변수 설정
 speed = 5 if difficulty == "Easy" else 8
+bpm = 120 if difficulty == "Easy" else 180 
 
-# 실제 게임이 구동될 HTML, CSS, JavaScript 코드
 game_code = f"""
 <!DOCTYPE html>
 <html>
 <head>
 <style>
-    body {{ margin: 0; display: flex; justify-content: center; background-color: #111; color: white; font-family: sans-serif; }}
+    body {{ margin: 0; display: flex; justify-content: center; background-color: #111; color: white; font-family: sans-serif; overflow: hidden; }}
     canvas {{ background-color: #000; border: 2px solid #333; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }}
-    #ui {{ position: absolute; top: 10px; font-size: 20px; font-weight: bold; text-align: center; width: 400px; pointer-events: none; }}
+    #ui {{ position: absolute; top: 10px; display: flex; justify-content: space-between; width: 380px; pointer-events: none; padding: 0 10px; font-size: 20px; font-weight: bold; }}
 </style>
 </head>
 <body>
-    <div id="ui">Score: <span id="score">0</span></div>
+    <div id="ui">
+        <div>Score: <span id="score">0</span></div>
+        <div>Combo: <span id="combo">0</span></div>
+    </div>
     <canvas id="gameCanvas" width="400" height="600"></canvas>
 
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     
-    // 게임 설정
-    const keys = ["d", "f", "j", "k"]; // 사용할 키보드 키
+    const keys = ["d", "f", "j", "k"];
     const laneWidth = canvas.width / 4;
-    const hitY = canvas.height - 100; // 판정선 위치
-    const speed = {speed}; // 파이썬에서 전달받은 떨어지는 속도
+    const hitY = canvas.height - 100;
+    const speed = {speed};
+    const bpm = {bpm};
+    const beatInterval = 60000 / bpm; 
     
     let score = 0;
+    let combo = 0;
+    let gameState = 0; 
     let gameStartTime = null;
-    let isPlaying = false;
-
-    // 🎵 채보 (Beatmap): 무작위가 아닌 특정 시간에 맞춰 떨어지도록 설계
-    // time: 노래 시작 후 몇 밀리초(ms) 뒤에 판정선에 닿아야 하는지
-    // lane: 0(D), 1(F), 2(J), 3(K) 레인
-    const beatmap = [
-        {{ time: 1000, lane: 0 }},
-        {{ time: 1500, lane: 1 }},
-        {{ time: 2000, lane: 2 }},
-        {{ time: 2500, lane: 3 }},
-        {{ time: 3000, lane: 1 }},
-        {{ time: 3000, lane: 2 }}, // 동시치기
-        {{ time: 3500, lane: 0 }},
-        {{ time: 4000, lane: 3 }}
-    ];
-
+    let lastBeatTime = 0;
+    
     let activeNotes = [];
+    let effects = []; 
+    
+    let judgmentText = "";
+    let judgmentColor = "";
+    let judgmentTimer = 0;
 
-    // 게임 시작 시 노트 생성
+    // 🎵 여러 가지 노트 패턴 정의 (0=D, 1=F, 2=J, 3=K)
+    const patterns = [
+        [[0], [1], [2], [3]],                   // 1. 왼쪽에서 오른쪽 계단
+        [[3], [2], [1], [0]],                   // 2. 오른쪽에서 왼쪽 계단
+        [[0, 3], [1, 2], [0, 3], [1, 2]],       // 3. 양끝 동시 -> 가운데 동시 교차
+        [[0], [2], [1], [3]],                   // 4. 지그재그
+        [[0, 1], [2, 3], [0, 1], [2, 3]],       // 5. 왼쪽 두개 -> 오른쪽 두개
+        [[0, 1, 2, 3], [], [0, 1, 2, 3], []]    // 6. 4키 전체 동시 치기 후 한 박자 쉬기
+    ];
+    
+    let currentPattern = [];
+    let patternStep = 0;
+
     function startGame() {{
-        // 실제 노래를 넣을 경우 여기서 오디오를 재생합니다.
-        // const bgm = new Audio('song.mp3'); bgm.play();
-        
+        gameState = 1;
         gameStartTime = performance.now();
-        activeNotes = JSON.parse(JSON.stringify(beatmap)); // 노트 복사
-        isPlaying = true;
+        lastBeatTime = gameStartTime;
+        score = 0;
+        combo = 0;
+        activeNotes = [];
+        patternStep = 0; // 시작할 때 패턴 스텝 초기화
+        currentPattern = patterns[0]; // 첫 패턴 설정
+        
+        document.getElementById("score").innerText = score;
+        document.getElementById("combo").innerText = combo;
         requestAnimationFrame(gameLoop);
     }}
 
-    // 키보드 입력 처리 (판정)
     window.addEventListener("keydown", (e) => {{
+        if (gameState === 0 && e.code === "Space") {{
+            startGame();
+            return;
+        }}
+
+        if (gameState !== 1) return;
+
         const keyIndex = keys.indexOf(e.key.toLowerCase());
         if (keyIndex > -1) {{
-            // 해당 레인의 가장 아래에 있는 노트 찾기
-            const noteIndex = activeNotes.findIndex(n => n.lane === keyIndex && n.y > hitY - 50 && n.y < hitY + 50);
-            
-            if (noteIndex > -1) {{
-                activeNotes.splice(noteIndex, 1); // 노트 제거 (Hit!)
-                score += 100;
-                document.getElementById("score").innerText = score;
+            const hitZone = 70; 
+            let closestNoteIndex = -1;
+            let minDistance = Infinity;
+
+            for (let i = 0; i < activeNotes.length; i++) {{
+                if (activeNotes[i].lane === keyIndex) {{
+                    const dist = Math.abs(activeNotes[i].y - hitY);
+                    if (dist < hitZone && dist < minDistance) {{
+                        minDistance = dist;
+                        closestNoteIndex = i;
+                    }}
+                }}
+            }}
+
+            if (closestNoteIndex > -1) {{
+                let text, color, pts;
+                if (minDistance <= 15) {{
+                    text = "Perfect!"; color = "#FFD700"; pts = 100;
+                }} else if (minDistance <= 35) {{
+                    text = "Expert"; color = "#00FF00"; pts = 70;
+                }} else if (minDistance <= 50) {{
+                    text = "Good"; color = "#00BFFF"; pts = 40;
+                }} else {{
+                    text = "Bad"; color = "#FF4500"; pts = 10;
+                }}
+
+                judgmentText = text;
+                judgmentColor = color;
+                judgmentTimer = 30; 
+
+                score += pts;
+                if (text !== "Bad") combo++; else combo = 0;
                 
-                // 타격 이펙트 (간단한 화면 반짝임)
-                ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-                ctx.fillRect(keyIndex * laneWidth, 0, laneWidth, canvas.height);
+                document.getElementById("score").innerText = score;
+                document.getElementById("combo").innerText = combo;
+
+                effects.push({{
+                    x: keyIndex * laneWidth + laneWidth / 2,
+                    y: hitY,
+                    radius: 10,
+                    alpha: 1,
+                    color: color
+                }});
+
+                activeNotes.splice(closestNoteIndex, 1); 
+            }} else {{
+                combo = 0;
+                document.getElementById("combo").innerText = combo;
             }}
         }}
     }});
 
-    // 매 프레임마다 화면을 그리는 메인 루프
     function gameLoop(currentTime) {{
-        if (!isPlaying) return;
+        if (gameState !== 1) return;
         
-        // 화면 지우기
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // 판정선 그리기
-        ctx.fillStyle = "#FF5555";
-        ctx.fillRect(0, hitY, canvas.width, 5);
-        
-        // 레인 구분선 그리기
+        // 🎵 정해진 패턴에 따라 노트 생성
+        if (currentTime - lastBeatTime > beatInterval) {{
+            // 현재 패턴의 모든 노트를 다 내보냈다면 새로운 패턴 무작위 선택
+            if (patternStep >= currentPattern.length) {{
+                const randomIndex = Math.floor(Math.random() * patterns.length);
+                currentPattern = patterns[randomIndex];
+                patternStep = 0;
+            }}
+
+            // 현재 스텝의 레인 배열 가져오기 (예: [0, 3])
+            const lanesToSpawn = currentPattern[patternStep];
+            
+            for(let i = 0; i < lanesToSpawn.length; i++) {{
+                activeNotes.push({{
+                    time: currentTime + 2000, 
+                    lane: lanesToSpawn[i],
+                    y: -50
+                }});
+            }}
+            
+            patternStep++;
+            lastBeatTime = currentTime;
+        }}
+
         ctx.strokeStyle = "#333";
         for(let i=1; i<4; i++) {{
             ctx.beginPath();
@@ -107,50 +179,70 @@ game_code = f"""
             ctx.stroke();
         }}
 
-        const timeElapsed = currentTime - gameStartTime;
+        ctx.fillStyle = "rgba(255, 85, 85, 0.5)";
+        ctx.fillRect(0, hitY - 15, canvas.width, 30); 
+        ctx.fillStyle = "#FF5555";
+        ctx.fillRect(0, hitY, canvas.width, 3); 
 
-        // 노트 위치 계산 및 그리기
         for (let i = activeNotes.length - 1; i >= 0; i--) {{
             let note = activeNotes[i];
             
-            // 노트가 화면에 보여야 할 시간 계산 (시간 거리 = 속력 * 시간)
-            // note.time에 판정선(hitY)에 닿아야 함
-            const timeUntilHit = note.time - timeElapsed;
+            const timeUntilHit = note.time - currentTime;
             note.y = hitY - (timeUntilHit / 1000 * 60 * speed);
 
-            // 노트가 화면 아래로 지나갔는지 확인 (Miss)
             if (note.y > canvas.height) {{
                 activeNotes.splice(i, 1);
-                score -= 10; // 감점
-                document.getElementById("score").innerText = score;
+                combo = 0;
+                document.getElementById("combo").innerText = combo;
+                judgmentText = "Miss";
+                judgmentColor = "#888";
+                judgmentTimer = 30;
                 continue;
             }}
 
-            // 화면에 보이는 노트만 그리기
             if (note.y > -50) {{
                 ctx.fillStyle = "#00DDFF";
-                ctx.fillRect(note.lane * laneWidth + 5, note.y, laneWidth - 10, 20);
+                ctx.beginPath();
+                ctx.roundRect(note.lane * laneWidth + 5, note.y - 10, laneWidth - 10, 20, 5);
+                ctx.fill();
             }}
         }}
 
-        // 애니메이션 계속 진행
+        for (let i = effects.length - 1; i >= 0; i--) {{
+            let eff = effects[i];
+            ctx.beginPath();
+            ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = eff.color;
+            ctx.globalAlpha = eff.alpha;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0; 
+
+            eff.radius += 2; 
+            eff.alpha -= 0.05; 
+
+            if (eff.alpha <= 0) effects.splice(i, 1);
+        }}
+
+        if (judgmentTimer > 0) {{
+            ctx.fillStyle = judgmentColor;
+            ctx.font = "bold 30px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(judgmentText, canvas.width / 2, hitY - 100);
+            judgmentTimer--;
+        }}
+
         requestAnimationFrame(gameLoop);
     }}
 
-    // 화면 클릭 시 게임 시작 (브라우저 정책 상 사용자의 입력이 있어야 오디오/게임 시작 가능)
-    canvas.addEventListener("click", () => {{
-        if (!isPlaying) startGame();
-    }});
-    
-    // 시작 대기 화면
     ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
-    ctx.fillText("화면을 클릭하면 시작합니다!", 80, canvas.height / 2);
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("스페이스바를 눌러 게임 시작!", canvas.width / 2, canvas.height / 2);
 
 </script>
 </body>
 </html>
 """
 
-# HTML 컴포넌트를 스트림릿 화면에 렌더링
 components.html(game_code, height=650)
